@@ -1,0 +1,75 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import '../styles/fonts.css';
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { localeList, localizePath, splitLocalePath, useI18n } from '../i18n';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { t, locale } = useI18n(Astro);
+const { title, description = t('meta.defaultDescription') } = Astro.props;
+const fullTitle = title ? `${title} ${t('meta.titleSuffix')}` : t('meta.defaultTitle');
+// Ссылки на эту же страницу на других языках — для поисковиков
+const { path } = splitLocalePath(Astro.url.pathname);
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Автовыбор языка: если язык браузера не русский — при первом заходе открываем английскую версию.
+      Если посетитель сам выбрал язык переключателем RU / EN, выбор запоминается (kaviku:lang) и уважается.
+      Поисковых роботов не перенаправляем, чтобы обе версии нормально индексировались.
+    -->
+    <script is:inline>
+      (function () {
+        try {
+          var path = location.pathname;
+          var onEn = /^\/en(\/|$)/.test(path);
+          var saved = localStorage.getItem('kaviku:lang');
+          if (/bot|crawler|spider|crawl|slurp|lighthouse/i.test(navigator.userAgent)) return;
+          var want = saved || ((navigator.language || 'ru').toLowerCase().indexOf('ru') === 0 ? 'ru' : 'en');
+          if (want === 'en' && !onEn) {
+            location.replace('/en' + (path === '/' ? '/' : path) + location.search + location.hash);
+          } else if (want === 'ru' && onEn && saved === 'ru') {
+            location.replace((path.replace(/^\/en/, '') || '/') + location.search + location.hash);
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#000000" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content="/icon-512.png" />
+    <meta property="og:locale" content={locale === 'ru' ? 'ru_RU' : 'en_US'} />
+    {localeList.map((l) => <link rel="alternate" hreflang={l} href={localizePath(l, path)} />)}
+  </head>
+  <body>
+    <Header />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+    <script>
+      // Настоящие лайки и скачивания из базы — на всех страницах
+      import { initStats } from '../scripts/stats';
+      initStats();
+    </script>
+  </body>
+</html>

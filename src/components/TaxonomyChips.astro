@@ -1,0 +1,123 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import type { Genre, Tag } from '../data/types';
+import { catalogFilterPath } from '../data/catalog';
+import { useI18n } from '../i18n';
+
+/**
+ * Жанры (оранжевые) и теги (серые) игры, под ними — платформы (синие).
+ * Каждый чип — ссылка на каталог с фильтром.
+ * На главной странице клик перехватывает скрипт каталога и добавляет фильтр без перезагрузки.
+ */
+interface Props {
+  genres: Genre[];
+  tags: Tag[];
+  platforms?: Tag[];
+  /** Ограничение для компактных карточек; остальные теги сворачиваются в «+N». */
+  maxGenres?: number;
+  maxTags?: number;
+  size?: 'sm' | 'md';
+}
+const { genres, tags, platforms = [], maxGenres = Infinity, maxTags = Infinity, size = 'sm' } = Astro.props;
+const { t, loc, href } = useI18n(Astro);
+const shownGenres = genres.slice(0, maxGenres);
+const shownTags = tags.slice(0, maxTags);
+const hidden = [...genres.slice(maxGenres), ...tags.slice(maxTags)];
+---
+
+<div class:list={['taxonomy', size]}>
+  {
+    (shownGenres.length > 0 || shownTags.length > 0) && (
+      <ul class="chips" role="list">
+        {shownGenres.map((g) => (
+          <li>
+            <a class="chip chip-genre" href={href(catalogFilterPath.genre(g.slug))} data-filter-genre={g.slug}>
+              {loc(g.name)}
+            </a>
+          </li>
+        ))}
+        {shownTags.map((tg) => (
+          <li>
+            <a class="chip" href={href(catalogFilterPath.tag(tg.slug))} data-filter-tag={tg.slug}>
+              {loc(tg.name)}
+            </a>
+          </li>
+        ))}
+        {hidden.length > 0 && (
+          <li>
+            <span class="chip more" title={hidden.map((x) => loc(x.name)).join(', ')}>
+              {t('catalog.moreTags', { n: hidden.length })}
+            </span>
+          </li>
+        )}
+      </ul>
+    )
+  }
+  {
+    platforms.length > 0 && (
+      <ul class="chips platforms" role="list" aria-label={t('catalog.platforms')}>
+        {platforms.map((p) => (
+          <li>
+            <a class="chip chip-platform" href={href(catalogFilterPath.platform(p.slug))} data-filter-platform={p.slug}>
+              {loc(p.name)}
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</div>
+
+<style>
+  .taxonomy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chips .chip {
+    z-index: 2; /* поверх растянутой ссылки карточки */
+  }
+
+  /* Платформы — синие */
+  .chip-platform {
+    color: var(--platform);
+    border-color: var(--platform-line);
+    background: var(--platform-soft);
+  }
+
+  .chip-platform:hover {
+    color: var(--text);
+    border-color: var(--platform);
+  }
+
+  .md {
+    gap: 0.5rem;
+  }
+
+  .md .chips {
+    gap: 0.45rem;
+  }
+
+  .md .chip {
+    padding: 0.3rem 0.75rem;
+    font-size: var(--fs-sm);
+  }
+
+  .more {
+    cursor: default;
+  }
+</style>

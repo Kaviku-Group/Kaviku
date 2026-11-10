@@ -1,0 +1,135 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import { useI18n } from '../i18n';
+
+/**
+ * Предупреждение перед страницей игры с маркировкой 18+ (и старше).
+ * Страница под окном размыта, пока посетитель не подтвердит переход.
+ * Подтверждение действует только на текущем просмотре и не сохраняется.
+ */
+interface Props {
+  rating: string;
+}
+const { rating } = Astro.props;
+const { t, href } = useI18n(Astro);
+---
+
+<div class="adult-gate" data-adult-gate role="dialog" aria-modal="true" aria-labelledby="adult-gate-title" aria-describedby="adult-gate-text">
+  <div class="card">
+    <span class="age">{rating}</span>
+    <h2 id="adult-gate-title">{t('adult.title')}</h2>
+    <p id="adult-gate-text">{t('adult.text')}</p>
+    <div class="actions">
+      <button class="btn btn-primary" type="button" data-adult-accept>{t('adult.accept')}</button>
+      <a class="btn btn-ghost" href={href('/#catalog')}>{t('adult.back')}</a>
+    </div>
+  </div>
+</div>
+
+<!-- Подтверждение не сохраняется: при каждом заходе окно показывается заново. -->
+<script is:inline>
+  (function () {
+    var gate = document.querySelector('[data-adult-gate]');
+    if (!gate) return;
+    document.documentElement.classList.add('adult-locked');
+    gate.querySelector('[data-adult-accept]').addEventListener('click', function () {
+      document.documentElement.classList.remove('adult-locked');
+      gate.remove();
+    });
+    gate.querySelector('[data-adult-accept]').focus();
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) window.location.reload();
+    });
+  })();
+</script>
+
+<style>
+  .adult-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgb(0 0 0 / 0.72);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+
+  .card {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
+    width: 100%;
+    max-width: 440px;
+    padding: 2rem 1.5rem;
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+    text-align: center;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    padding: 1px;
+    border-radius: inherit;
+    background: var(--brand-gradient);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  .age {
+    display: grid;
+    place-items: center;
+    min-width: 4rem;
+    height: 2.6rem;
+    padding: 0 0.75rem;
+    border-radius: 10px;
+    border: 2px solid var(--brand-deep);
+    color: var(--text);
+    font-size: var(--fs-lg);
+    font-weight: 800;
+  }
+
+  h2 {
+    font-size: var(--fs-xl);
+    font-weight: 800;
+    color: var(--brand);
+  }
+
+  p {
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  @media (max-width: 479px) {
+    .actions .btn {
+      width: 100%;
+    }
+  }
+
+  /* Пока нет согласия — страница не прокручивается */
+  :global(html.adult-locked) {
+    overflow: hidden;
+  }
+</style>

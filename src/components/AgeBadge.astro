@@ -1,0 +1,57 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import type { AgeRating } from '../data/taxonomy';
+import { useI18n } from '../i18n';
+
+/**
+ * Возрастная маркировка (любой возраст «N+») — в правом верхнем углу обложки.
+ * Нейтральный значок, не путается с жанрами и тегами; 18+ и старше — с оранжево-красной рамкой.
+ */
+interface Props {
+  rating?: AgeRating;
+  overlay?: boolean; // поверх обложки (в правом верхнем углу)
+}
+const { rating, overlay = false } = Astro.props;
+const { t } = useI18n(Astro);
+const adult = rating ? Number.parseInt(rating, 10) >= 18 : false;
+---
+
+{
+  rating && (
+    <span class:list={['age', { overlay, adult }]} title={`${t('game.ageRating')}: ${rating}`}>
+      {rating}
+    </span>
+  )
+}
+
+<style>
+  .age {
+    display: inline-grid;
+    place-items: center;
+    min-width: 2.4rem;
+    height: 1.6rem;
+    padding: 0 0.4rem;
+    border-radius: 6px;
+    border: 1.5px solid var(--text-muted);
+    color: var(--text);
+    font-size: var(--fs-xs);
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .adult {
+    border-color: var(--brand-deep);
+  }
+  .overlay {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    z-index: 1;
+    background: rgb(0 0 0 / 0.78);
+    pointer-events: none;
+  }
+</style>

@@ -1,0 +1,81 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import Icon from './Icon.astro';
+import { siteConfig, isUsableUrl } from '../config/site';
+import { useI18n } from '../i18n';
+
+/**
+ * Кнопка «Предложить игру» → Google Форма (в новой вкладке).
+ * Ссылка задаётся в одном месте: src/config/site.ts → submitGameFormUrl.
+ * Пока её нет, кнопка показывается в состоянии «скоро» и никуда не ведёт.
+ *
+ * variant="footer" — с подписью, справа (подвал);
+ * variant="inline" — только кнопка (пустые состояния каталога).
+ */
+interface Props {
+  variant?: 'footer' | 'inline';
+}
+const { variant = 'footer' } = Astro.props;
+const { t } = useI18n(Astro);
+const url = siteConfig.submitGameFormUrl;
+const enabled = isUsableUrl(url);
+const hintId = `submit-soon-${variant}`;
+---
+
+<div class:list={['submit', variant]}>
+  {
+    enabled ? (
+      <a class="btn btn-primary" href={url} target="_blank" rel="noopener noreferrer">
+        <Icon name="plus" />
+        {t('footer.submitGame')}
+      </a>
+    ) : (
+      <span class="btn btn-primary" aria-disabled="true" aria-describedby={hintId} title={t('footer.submitSoon')}>
+        <Icon name="plus" />
+        {t('footer.submitGame')}
+      </span>
+    )
+  }
+  {
+    (variant === 'footer' || !enabled) && (
+      <p class="hint" id={enabled ? undefined : hintId}>
+        {enabled ? t('footer.submitHint') : t('footer.submitSoon')}
+      </p>
+    )
+  }
+</div>
+
+<style>
+  .submit {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4rem;
+  }
+  .hint {
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    text-align: right;
+  }
+  .inline {
+    align-items: center;
+  }
+  .inline .hint {
+    text-align: center;
+  }
+  @media (max-width: 599px) {
+    .footer {
+      align-items: stretch;
+    }
+    .footer .btn {
+      width: 100%;
+    }
+    .hint {
+      text-align: center;
+    }
+  }
+</style>

@@ -1,0 +1,341 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import Icon from './Icon.astro';
+import SupportSiteButton from './SupportSiteButton.astro';
+import LangSwitch from './LangSwitch.astro';
+import { useI18n } from '../i18n';
+
+const { t, href } = useI18n(Astro);
+const nav = [
+  { href: href('/#catalog'), label: t('header.nav.catalog') },
+  { href: href('/#featured'), label: t('header.nav.featured') },
+];
+const q = Astro.url.searchParams.get('q') ?? '';
+---
+
+<header class="site-header" data-header>
+  <div class="container bar">
+    <a class="brand" href={href('/')} aria-label={t('header.homeLabel')}>
+      <!-- Полный логотип (компьютер) и знак без текста (телефон); файлы — обрезанные копии оригиналов -->
+      <img
+        class="logo-full"
+        src="/assets/logo/kaviku-logo-full-h200.png"
+        alt="Kaviku"
+        width="230"
+        height="200"
+        decoding="async"
+      />
+      <img
+        class="logo-mark"
+        src="/assets/logo/kaviku-logo-mark-h128.png"
+        alt="Kaviku"
+        width="173"
+        height="128"
+        decoding="async"
+      />
+    </a>
+
+    <nav class="nav-desktop" aria-label={t('header.nav.catalog')}>
+      {nav.map((item) => <a href={item.href}>{item.label}</a>)}
+    </nav>
+
+    <form class="search" action={href('/#catalog')} method="get" role="search" data-site-search data-search-panel>
+      <label class="visually-hidden" for="header-q">{t('header.searchLabel')}</label>
+      <Icon name="search" class="search-icon" />
+      <input
+        id="header-q"
+        name="q"
+        type="search"
+        value={q}
+        placeholder={t('header.searchPlaceholder')}
+        autocomplete="off"
+        enterkeyhint="search"
+      />
+      <button class="visually-hidden" type="submit">{t('header.searchSubmit')}</button>
+    </form>
+
+    <SupportSiteButton class="support-desktop" />
+
+    <LangSwitch />
+
+    <div class="mobile-actions">
+      <button class="icon-btn" type="button" data-toggle-search aria-expanded="false" aria-label={t('header.openSearch')}>
+        <Icon name="search" />
+      </button>
+      <button
+        class="icon-btn"
+        type="button"
+        data-toggle-menu
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+        aria-label={t('header.openMenu')}
+        data-label-open={t('header.openMenu')}
+        data-label-close={t('header.closeMenu')}
+      >
+        <Icon name="menu" class="i-open" />
+        <Icon name="close" class="i-close" />
+      </button>
+    </div>
+  </div>
+
+  <div class="mobile-menu" id="mobile-menu" hidden>
+    <nav class="container" aria-label={t('header.nav.catalog')}>
+      {nav.map((item) => <a href={item.href} data-close-menu>{item.label}</a>)}
+      <SupportSiteButton class="support-mobile" />
+    </nav>
+  </div>
+</header>
+
+<script>
+  const header = document.querySelector<HTMLElement>('[data-header]');
+  if (header) {
+    const menuBtn = header.querySelector<HTMLButtonElement>('[data-toggle-menu]')!;
+    const menu = header.querySelector<HTMLElement>('#mobile-menu')!;
+    const searchBtn = header.querySelector<HTMLButtonElement>('[data-toggle-search]')!;
+    const searchInput = header.querySelector<HTMLInputElement>('#header-q')!;
+
+    const setMenu = (open: boolean) => {
+      menu.hidden = !open;
+      header.classList.toggle('menu-open', open);
+      menuBtn.setAttribute('aria-expanded', String(open));
+      menuBtn.setAttribute('aria-label', (open ? menuBtn.dataset.labelClose : menuBtn.dataset.labelOpen) ?? '');
+      if (open) setSearch(false);
+    };
+    const setSearch = (open: boolean) => {
+      header.classList.toggle('search-open', open);
+      searchBtn.setAttribute('aria-expanded', String(open));
+      if (open) {
+        setMenu(false);
+        searchInput.focus();
+      }
+    };
+
+    menuBtn.addEventListener('click', () => setMenu(menu.hidden === true));
+    searchBtn.addEventListener('click', () => setSearch(!header.classList.contains('search-open')));
+    menu.querySelectorAll('[data-close-menu]').forEach((a) => a.addEventListener('click', () => setMenu(false)));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        setMenu(false);
+        setSearch(false);
+      }
+    });
+    window.matchMedia('(min-width: 900px)').addEventListener('change', (e) => {
+      if (e.matches) {
+        setMenu(false);
+        setSearch(false);
+      }
+    });
+  }
+</script>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    /* Строго #000: у логотипа непрозрачный чёрный фон, полупрозрачная шапка выдала бы его рамку */
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    height: var(--header-h);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    flex: none;
+    border-radius: var(--radius-sm);
+  }
+
+  .logo-full {
+    display: none;
+    height: 68px;
+    width: auto;
+  }
+
+  .logo-mark {
+    height: 38px;
+    width: auto;
+  }
+
+  .nav-desktop {
+    display: none;
+    gap: 0.25rem;
+  }
+
+  .nav-desktop a,
+  .mobile-menu a:not(.btn) {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: var(--fs-sm);
+    transition: color var(--t-fast) var(--ease);
+  }
+
+  .nav-desktop a {
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .nav-desktop a:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+
+  /* ----- Поиск ----- */
+  .search {
+    position: relative;
+    flex: 1;
+    max-width: 440px;
+    margin-left: auto;
+    display: none;
+  }
+
+  .search input {
+    width: 100%;
+    height: var(--tap);
+    padding: 0 1rem 0 2.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    font-size: var(--fs-sm);
+    transition:
+      border-color var(--t-fast) var(--ease),
+      background-color var(--t-fast) var(--ease);
+  }
+
+  .search input::placeholder {
+    color: var(--text-faint);
+  }
+
+  .search input:focus {
+    outline: none;
+    border-color: var(--brand);
+    background: var(--surface-1);
+  }
+
+  .search :global(.search-icon) {
+    position: absolute;
+    left: 0.95rem;
+    top: 50%;
+    translate: 0 -50%;
+    color: var(--text-faint);
+    pointer-events: none;
+  }
+
+  /* ----- Мобильные кнопки ----- */
+  .mobile-actions {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  /* На телефоне переключатель языка прижат вправо, рядом с поиском и меню */
+  @media (max-width: 899px) {
+    .bar > :global(.lang) {
+      margin-left: auto;
+    }
+    .bar {
+      gap: 0.5rem;
+    }
+  }
+
+  .icon-btn {
+    display: grid;
+    place-items: center;
+    width: var(--tap);
+    height: var(--tap);
+    border-radius: var(--radius-sm);
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: 1.25rem;
+  }
+
+  .icon-btn:hover,
+  .icon-btn[aria-expanded='true'] {
+    background: var(--surface-2);
+    color: var(--brand);
+  }
+
+  .icon-btn :global(.i-close) {
+    display: none;
+  }
+  .menu-open .icon-btn :global(.i-close) {
+    display: block;
+  }
+  .menu-open .icon-btn :global(.i-open) {
+    display: none;
+  }
+
+  :global(.support-desktop) {
+    display: none !important;
+  }
+
+  .mobile-menu {
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .mobile-menu nav {
+    display: flex;
+    flex-direction: column;
+    padding-block: 0.5rem 1rem;
+  }
+
+  .mobile-menu a:not(.btn) {
+    display: flex;
+    align-items: center;
+    min-height: 52px;
+    font-size: var(--fs-md);
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mobile-menu :global(.support-mobile) {
+    margin-top: 1rem;
+    width: 100%;
+  }
+
+  /* На телефоне поиск раскрывается отдельной строкой под шапкой */
+  @media (max-width: 899px) {
+    .search-open .search {
+      display: block;
+      position: absolute;
+      inset: 100% 0 auto 0;
+      max-width: none;
+      padding: 0.75rem var(--gutter);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+    .search-open .search :global(.search-icon) {
+      left: calc(var(--gutter) + 0.95rem);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .logo-full,
+    .nav-desktop,
+    .search {
+      display: flex;
+    }
+    .search {
+      display: block;
+    }
+    .logo-mark,
+    .mobile-actions,
+    .mobile-menu {
+      display: none !important;
+    }
+    :global(.support-desktop) {
+      display: inline-flex !important;
+    }
+  }
+</style>

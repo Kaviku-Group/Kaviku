@@ -1,0 +1,20 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+// Game page in English: /en/games/<slug>
+import GameView from '../../../views/GameView.astro';
+import { getPublishedGames } from '../../../data/catalog';
+import type { GameSummary } from '../../../data/types';
+
+export async function getStaticPaths() {
+  const games = await getPublishedGames();
+  return games.map((game) => ({ params: { slug: game.slug }, props: { game } }));
+}
+
+const { game } = Astro.props as { game: GameSummary };
+---
+
+<GameView game={game} />

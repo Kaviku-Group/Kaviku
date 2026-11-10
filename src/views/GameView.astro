@@ -1,0 +1,407 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+/**
+ * Страница игры (общая для /games/<slug> и /en/games/<slug>):
+ * обложка → название, автор, жанры и теги, кнопки → описание → видео и скриншоты.
+ * Всё берётся из папки игры games/<папка>/ (index.md + картинки).
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Cover from '../components/Cover.astro';
+import GameStats from '../components/GameStats.astro';
+import Icon from '../components/Icon.astro';
+import TaxonomyChips from '../components/TaxonomyChips.astro';
+import AgeBadge from '../components/AgeBadge.astro';
+import GameLangBadge from '../components/GameLangBadge.astro';
+import AdultGate from '../components/AdultGate.astro';
+import LikeButton from '../components/LikeButton.astro';
+import ScreenshotGallery from '../components/ScreenshotGallery.astro';
+import { getGameDescription, getTaxonomy, resolveGameTaxonomy } from '../data/catalog';
+import type { GameSummary } from '../data/types';
+import { isUsableUrl } from '../config/site';
+import { useI18n } from '../i18n';
+import { renderInlineMarkdown } from '../lib/inline-markdown';
+
+interface Props {
+  game: GameSummary;
+}
+const { game } = Astro.props;
+const { t, loc, href, formatDate, locale } = useI18n(Astro);
+const { genres, tags, platforms } = resolveGameTaxonomy(game, await getTaxonomy());
+const descriptionHtml = await getGameDescription(game.slug, locale);
+const title = loc(game.title);
+// Игры 18+ (и старше) открываются после предупреждения
+const isAdult = !!game.ageRating && Number.parseInt(game.ageRating, 10) >= 18;
+const shortDescription = loc(game.shortDescription);
+
+// Файл из папки игры (/downloads/…) скачивается прямо с сайта; внешняя ссылка — только https
+const isLocalFile = !!game.downloadUrl?.startsWith('/downloads/');
+const canDownload = !!game.downloadUrl && (isLocalFile || isUsableUrl(game.downloadUrl));
+// Скачивание идёт через /go/download/<slug>: сервер засчитывает его и перенаправляет на ссылку автора.
+// В режиме npm run dev серверных функций нет — там ссылка ведёт напрямую.
+const downloadHref = import.meta.env.DEV ? game.downloadUrl : `/go/download/${game.slug}`;
+const canSupport = !!game.supportUrl && isUsableUrl(game.supportUrl);
+const showStudio = game.studio && game.studio.name !== game.author.nickname;
+
+const facts = [
+  game.version && { label: t('game.version'), value: game.version },
+  { label: t('game.published'), value: formatDate(game.publishedAt) },
+  game.updatedAt && game.updatedAt !== game.publishedAt && { label: t('game.updated'), value: formatDate(game.updatedAt) },
+].filter((f): f is { label: string; value: string } => !!f);
+---
+
+<BaseLayout title={title} description={shortDescription}>
+  {isAdult && <AdultGate rating={game.ageRating!} />}
+  <article class="container game">
+    <a class="back" href={href('/#catalog')}><Icon name="arrow-right" class="flip" />{t('game.backToCatalog')}</a>
+
+    <!-- Заглавное фото -->
+    <div class="frame cover-frame">
+      <Cover title={title} cover={game.cover} sizes="(min-width: 1040px) 1000px, 100vw" eager />
+      <GameLangBadge languages={game.languages} />
+      <AgeBadge rating={game.ageRating} overlay />
+    </div>
+
+    <!-- Название, автор, жанры и теги -->
+    <header class="head">
+      <h1>{title}</h1>
+      <p class="byline">
+        <span class="by">{t('common.by')}:</span>{' '}
+        {
+          game.author.slug ? (
+            <a class="author" href={href(`/authors/${game.author.slug}`)} title={t('author.open', { name: game.author.nickname })}>
+              {game.author.nickname}
+            </a>
+          ) : (
+            <span class="author">{game.author.nickname}</span>
+          )
+        }
+        {showStudio && <span class="studio"> · {game.studio!.name}</span>}
+      </p>
+      <TaxonomyChips genres={genres} tags={tags} platforms={platforms} size="md" />
+
+      <div class="actions">
+        {
+          canDownload ? (
+            <a
+              class="btn btn-primary btn-lg"
+              href={downloadHref}
+              target={isLocalFile ? undefined : '_blank'}
+              rel="noopener noreferrer nofollow"
+              data-download-link
+            >
+              <Icon name="download" />
+              {t('game.download')}
+            </a>
+          ) : (
+            <span class="btn btn-primary btn-lg" aria-disabled="true" title={t('game.downloadUnavailable')}>
+              <Icon name="download" />
+              {t('game.download')}
+            </span>
+          )
+        }
+        <LikeButton slug={game.slug} />
+        {
+          canSupport && (
+            <a class="btn btn-outline btn-lg" href={game.supportUrl} target="_blank" rel="noopener noreferrer nofollow">
+              <Icon name="gift" />
+              {t('game.support')}
+            </a>
+          )
+        }
+      </div>
+
+      <div class="meta">
+        <GameStats slug={game.slug} likes={game.likes} downloads={game.downloads} size="lg" />
+        <dl class="facts">
+          {
+            facts.map((f) => (
+              <div>
+                <dt>{f.label}</dt>
+                <dd>{f.value}</dd>
+              </div>
+            ))
+          }
+        </dl>
+      </div>
+    </header>
+
+    <!-- Описание -->
+    <section class="block" aria-labelledby="desc-title">
+      <h2 id="desc-title">{t('game.description')}</h2>
+      {
+        descriptionHtml ? (
+          <div class="prose" set:html={descriptionHtml} />
+        ) : (
+          <p class="prose" set:html={renderInlineMarkdown(shortDescription)} />
+        )
+      }
+    </section>
+
+    <!-- Скриншоты, которые можно листать -->
+    {
+      (game.screenshots.length > 0 || game.videos.length > 0) && (
+        <section class="block" aria-labelledby="shots-title">
+          <h2 id="shots-title">{game.videos.length > 0 ? t('game.videoAndScreenshots') : t('game.screenshots')}</h2>
+          <div class="frame shots-frame">
+            <ScreenshotGallery title={title} screenshots={game.screenshots} videos={game.videos} cover={game.cover} />
+          </div>
+        </section>
+      )
+    }
+  </article>
+</BaseLayout>
+
+<style>
+  .game {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 1040px;
+    padding-top: 1rem;
+  }
+
+  .back {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 0.4rem;
+    min-height: var(--tap);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: var(--fs-sm);
+  }
+
+  .back:hover {
+    color: var(--brand);
+  }
+
+  .game :global(.flip) {
+    transform: scaleX(-1);
+  }
+
+  /* Рамка в фирменном градиенте — как у «Игры недели» */
+  .frame {
+    position: relative;
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+    isolation: isolate;
+  }
+
+  .frame::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    padding: 1px;
+    border-radius: inherit;
+    background: var(--brand-gradient);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .cover-frame {
+    overflow: hidden;
+  }
+
+  /* На широком экране обложка — широкий баннер, как в наброске, чтобы не занимать весь экран */
+  @media (min-width: 900px) {
+    .cover-frame :global(.cover) {
+      aspect-ratio: 2 / 1;
+    }
+  }
+
+  .shots-frame {
+    padding: 1rem;
+  }
+
+  .head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  h1 {
+    font-size: var(--fs-2xl);
+    font-weight: 800;
+  }
+
+  .byline {
+    font-weight: 700;
+  }
+
+  .by {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .author {
+    color: var(--brand);
+  }
+
+  a.author {
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+    transition: text-decoration-color var(--t-fast) var(--ease);
+  }
+
+  a.author:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .studio {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+  }
+
+  .btn-lg {
+    min-height: 52px;
+    padding-inline: 1.5rem;
+    font-size: var(--fs-md);
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 2rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin: 0;
+    font-size: var(--fs-sm);
+  }
+
+  .facts div {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .facts dt {
+    color: var(--text-faint);
+  }
+
+  .facts dd {
+    margin: 0;
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-top: 1rem;
+  }
+
+  .block h2 {
+    font-size: var(--fs-xl);
+    font-weight: 800;
+    color: var(--brand);
+  }
+
+  /* ---------- Текст описания из index.md ---------- */
+  .prose {
+    max-width: 72ch;
+    color: var(--text-muted);
+    font-size: var(--fs-md);
+    line-height: 1.7;
+  }
+
+  .prose :global(> * + *) {
+    margin-top: 0.9em;
+  }
+
+  .prose :global(h2),
+  .prose :global(h3),
+  .prose :global(h4) {
+    margin-top: 1.6em;
+    color: var(--text);
+    font-weight: 800;
+    line-height: 1.3;
+  }
+
+  .prose :global(h2) {
+    font-size: var(--fs-lg);
+  }
+
+  .prose :global(h3),
+  .prose :global(h4) {
+    font-size: var(--fs-md);
+  }
+
+  .prose :global(strong) {
+    color: var(--text);
+  }
+
+  .prose :global(a) {
+    color: var(--brand);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .prose :global(ul),
+  .prose :global(ol) {
+    padding-left: 1.4em;
+  }
+
+  .prose :global(li + li) {
+    margin-top: 0.35em;
+  }
+
+  .prose :global(li::marker) {
+    color: var(--brand);
+  }
+
+  .prose :global(code) {
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 0.9em;
+  }
+
+  .prose :global(blockquote) {
+    margin-inline: 0;
+    padding-left: 1em;
+    border-left: 3px solid var(--brand);
+  }
+
+  .prose :global(img) {
+    border-radius: var(--radius);
+  }
+
+  .prose :global(hr) {
+    border: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 599px) {
+    .actions .btn {
+      width: 100%;
+    }
+    .shots-frame {
+      padding: 0.75rem;
+    }
+  }
+</style>

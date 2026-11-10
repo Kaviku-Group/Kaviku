@@ -1,0 +1,102 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+/** Главная страница (общая для / и /en/): «Игра недели» и каталог. */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import FeaturedGame from '../components/FeaturedGame.astro';
+import Catalog from '../components/Catalog.astro';
+import { getFeaturedGame, getPublishedGames, getTaxonomy } from '../data/catalog';
+
+// Игры берутся из папки games/ через src/data/catalog.ts
+const [games, fallback, taxonomy] = await Promise.all([getPublishedGames(), getFeaturedGame(), getTaxonomy()]);
+---
+
+<BaseLayout>
+  {
+    fallback && (
+      <>
+        {/* Запасной вариант (если база недоступна); настоящая «Игра недели» приходит из /api/featured */}
+        <div class="featured-slot" data-featured-slot data-pending>
+          <FeaturedGame game={fallback} taxonomy={taxonomy} />
+        </div>
+        {/* Заготовки блока для каждой игры: показывается та, что победила на этой неделе */}
+        {games.map((game) => (
+          <template data-featured-template={game.slug}>
+            <FeaturedGame game={game} taxonomy={taxonomy} />
+          </template>
+        ))}
+      </>
+    )
+  }
+  <Catalog games={games} taxonomy={taxonomy} />
+</BaseLayout>
+
+<script>
+  import { pageI18n } from '../i18n';
+  import { reapplyStats } from '../scripts/stats';
+  import { getHideAdult, HIDE_ADULT_EVENT } from '../scripts/adult-filter';
+
+  const slot = document.querySelector<HTMLElement>('[data-featured-slot]');
+  if (slot) {
+    const { t } = pageI18n();
+    // «Не показывать игры 18+»: если игра недели 18+ — блок скрывается
+    const applyAdultFilter = () => {
+      const isAdult = slot.querySelector<HTMLElement>('[data-featured-section]')?.dataset.adult === '1';
+      slot.hidden = isAdult && getHideAdult();
+    };
+    applyAdultFilter();
+    document.addEventListener(HIDE_ADULT_EVENT, applyAdultFilter);
+    const reveal = () => slot.removeAttribute('data-pending');
+    // Если ответ задерживается — показываем запасной вариант, чтобы не было пустого места
+    const timer = setTimeout(reveal, 1500);
+
+    fetch('/api/featured', { credentials: 'same-origin' })
+      .then((r) => (r.ok && (r.headers.get('Content-Type') ?? '').includes('json') ? r.json() : null))
+      .then((data: { slug: string | null; weeklyLikes: number } | null) => {
+        if (!data?.slug) return;
+        const current = slot.querySelector<HTMLElement>('[data-featured-section]');
+        if (current?.dataset.slug !== data.slug) {
+          const tpl = document.querySelector<HTMLTemplateElement>(`template[data-featured-template="${data.slug}"]`);
+          if (tpl) {
+            slot.replaceChildren(tpl.content.cloneNode(true));
+            reapplyStats();
+            applyAdultFilter();
+          }
+        }
+        const weekly = slot.querySelector<HTMLElement>('[data-weekly]');
+        const text = slot.querySelector<HTMLElement>('[data-weekly-text]');
+        if (weekly && text && data.weeklyLikes > 0) {
+          text.textContent = t('featured.weeklyLikes', { n: data.weeklyLikes });
+          weekly.hidden = false;
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        clearTimeout(timer);
+        reveal();
+      });
+  }
+</script>
+
+<style>
+  .featured-slot {
+    transition: opacity 250ms var(--ease);
+  }
+
+  .featured-slot[data-pending] {
+    opacity: 0;
+  }
+
+  .featured-slot[hidden] {
+    display: none;
+  }
+
+  @media (scripting: none) {
+    .featured-slot[data-pending] {
+      opacity: 1;
+    }
+  }
+</style>

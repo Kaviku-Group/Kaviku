@@ -1,0 +1,21 @@
+# Сборка и зависимости
+dist/
+.astro/
+node_modules/
+
+# Секреты и локальная база (никогда не коммитить)
+.dev.vars
+.env
+.env.*
+.wrangler/
+
+# Игры хранятся только локально — в репозитории лишь шаблон и инструкция
+games/*
+!games/README.md
+!games/_template/
+
+# Системное
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/

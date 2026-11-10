@@ -1,0 +1,143 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+/** Страница автора (общая для /authors/<slug> и /en/authors/<slug>): все его игры. */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import GameCard from '../components/GameCard.astro';
+import Icon from '../components/Icon.astro';
+import { getTaxonomy } from '../data/catalog';
+import type { GameSummary } from '../data/types';
+import { useI18n } from '../i18n';
+
+interface Props {
+  nickname: string;
+  games: GameSummary[];
+}
+const { nickname, games } = Astro.props;
+const { t, href } = useI18n(Astro);
+const taxonomy = await getTaxonomy();
+const studios = [...new Set(games.map((g) => g.studio?.name).filter((s): s is string => !!s && s !== nickname))];
+---
+
+<BaseLayout title={t('author.title', { name: nickname })}>
+  <section class="container author">
+    <a class="back" href={href('/#catalog')}><Icon name="arrow-right" class="flip" />{t('game.backToCatalog')}</a>
+
+    <header class="head">
+      <p class="label">{t('author.label')}</p>
+      <h1>{nickname}</h1>
+      <p class="meta">
+        {t('author.games', { n: games.length })}
+        {studios.length > 0 && <span> · {studios.join(', ')}</span>}
+      </p>
+    </header>
+
+    <div class="grid" data-author-grid>
+      {games.map((game) => <GameCard game={game} taxonomy={taxonomy} />)}
+    </div>
+    <p class="all-hidden" data-all-hidden hidden>{t('author.allHidden')}</p>
+  </section>
+</BaseLayout>
+
+<script>
+  // «Не показывать игры 18+» (настройка из фильтров каталога) действует и здесь
+  import { getHideAdult } from '../scripts/adult-filter';
+
+  if (getHideAdult()) {
+    const cards = [...document.querySelectorAll<HTMLElement>('[data-author-grid] [data-game]')];
+    cards.filter((card) => card.dataset.adult === '1').forEach((card) => (card.hidden = true));
+    // Все игры автора скрыты — объясняем почему, а не показываем пустую страницу
+    const note = document.querySelector<HTMLElement>('[data-all-hidden]');
+    if (note && cards.length > 0 && cards.every((card) => card.hidden)) note.hidden = false;
+  }
+</script>
+
+<style>
+  .author {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding-top: 1rem;
+  }
+
+  .back {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 0.4rem;
+    min-height: var(--tap);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: var(--fs-sm);
+  }
+
+  .back:hover {
+    color: var(--brand);
+  }
+
+  .author :global(.flip) {
+    transform: scaleX(-1);
+  }
+
+  .label {
+    color: var(--text-faint);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  h1 {
+    font-size: var(--fs-2xl);
+    font-weight: 800;
+    color: var(--brand);
+  }
+
+  .meta {
+    color: var(--text-muted);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .grid > :global([hidden]) {
+    display: none;
+  }
+
+  .all-hidden {
+    padding: 2rem 1rem;
+    border-radius: var(--radius);
+    border: 1px dashed var(--border-strong);
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  .all-hidden[hidden] {
+    display: none;
+  }
+
+  @media (min-width: 600px) {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+</style>

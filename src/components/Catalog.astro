@@ -1,0 +1,940 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import GameCard from './GameCard.astro';
+import Icon from './Icon.astro';
+import EmptyState from './EmptyState.astro';
+import SubmitGameButton from './SubmitGameButton.astro';
+import type { GameSummary } from '../data/types';
+import type { TaxonomyIndex } from '../data/catalog';
+import { siteConfig } from '../config/site';
+import { useI18n } from '../i18n';
+
+interface Props {
+  games: GameSummary[];
+  taxonomy: TaxonomyIndex;
+}
+const { games, taxonomy } = Astro.props;
+const { t, loc } = useI18n(Astro);
+const hasGames = games.length > 0;
+
+// В панели фильтров — все жанры и теги из справочника (потом — из таблиц D1)
+const usedGenres = taxonomy.genres;
+const usedTags = taxonomy.tags;
+const usedPlatforms = taxonomy.platforms ?? [];
+const names = {
+  genres: Object.fromEntries(usedGenres.map((g) => [g.slug, loc(g.name)])),
+  tags: Object.fromEntries(usedTags.map((tg) => [tg.slug, loc(tg.name)])),
+  platforms: Object.fromEntries(usedPlatforms.map((p) => [p.slug, loc(p.name)])),
+};
+// Изначальный порядок — «сначала новые», чтобы страница выглядела правильно и без JS
+const initial = [...games].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+const pageSize = siteConfig.catalogPageSize;
+---
+
+{/* Каталог пуст: игр ещё нет совсем — без поиска и фильтров, только приглашение предложить игру */}
+{
+  !hasGames && (
+    <section class="catalog container" id="catalog" aria-labelledby="catalog-title">
+      <div class="head">
+        <h2 id="catalog-title">{t('catalog.title')}</h2>
+      </div>
+      <EmptyState title={t('catalog.noGamesTitle')} headingLevel="p">
+        <SubmitGameButton variant="inline" />
+      </EmptyState>
+    </section>
+  )
+}
+
+{hasGames && (
+<section class="catalog container" id="catalog" aria-labelledby="catalog-title" data-catalog data-names={JSON.stringify(names)} data-page-size={pageSize}>
+  <div class="head">
+    <h2 id="catalog-title">{t('catalog.title')}</h2>
+    <p class="count" data-count aria-live="polite">{t('catalog.found', { n: games.length })}</p>
+  </div>
+
+  <div class="toolbar">
+    <div class="search">
+      <label class="visually-hidden" for="catalog-q">{t('catalog.searchLabel')}</label>
+      <Icon name="search" class="search-icon" />
+      <input id="catalog-q" type="search" placeholder={t('catalog.searchPlaceholder')} autocomplete="off" enterkeyhint="search" data-q />
+      <button class="clear" type="button" data-clear-q aria-label={t('catalog.clearSearch')} hidden>
+        <Icon name="x" />
+      </button>
+    </div>
+
+    <button class="btn btn-ghost filters-btn" type="button" data-open-filters aria-expanded="false" aria-controls="filters-panel">
+      <Icon name="filters" />
+      {t('catalog.filters')}
+      <span class="filter-count" data-filter-count hidden></span>
+    </button>
+
+    <label class="sort">
+      <span class="visually-hidden">{t('catalog.sortLabel')}</span>
+      <select data-sort>
+        <option value="new">{t('catalog.sort.new')}</option>
+        <option value="likes">{t('catalog.sort.likes')}</option>
+        <option value="downloads">{t('catalog.sort.downloads')}</option>
+      </select>
+      <Icon name="chevron-down" class="sort-chevron" />
+    </label>
+  </div>
+
+  <div class="backdrop" data-backdrop hidden></div>
+  <div class="panel" id="filters-panel" data-panel hidden role="region" aria-label={t('catalog.filters')}>
+    <div class="sheet-head">
+      <span>{t('catalog.filters')}</span>
+      <button class="icon-btn" type="button" data-close-filters aria-label={t('common.close')}>
+        <Icon name="close" />
+      </button>
+    </div>
+    <div class="groups">
+      <!-- Настройка посетителя: запоминается в браузере, действует и на «Игру недели», и на страницы авторов -->
+      <label class="adult-toggle">
+        <input type="checkbox" data-hide-adult />
+        <span class="box" aria-hidden="true"></span>
+        <span>{t('catalog.hideAdult')}</span>
+      </label>
+      <fieldset>
+        <legend>{t('catalog.genres')} <small>- {t('catalog.genresHint')}</small></legend>
+        <div class="options">
+          {
+            usedGenres.map((g) => (
+              <button class="chip chip-toggle" type="button" aria-pressed="false" data-genre={g.slug}>
+                {loc(g.name)}
+              </button>
+            ))
+          }
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>{t('catalog.tags')} <small>- {t('catalog.tagsHint')}</small></legend>
+        <div class="options">
+          {
+            usedTags.map((tg) => (
+              <button class="chip chip-toggle" type="button" aria-pressed="false" data-tag={tg.slug}>
+                {loc(tg.name)}
+              </button>
+            ))
+          }
+        </div>
+      </fieldset>
+      {
+        usedPlatforms.length > 0 && (
+          <fieldset>
+            <legend>
+              {t('catalog.platforms')} <small>- {t('catalog.platformsHint')}</small>
+            </legend>
+            <div class="options">
+              {usedPlatforms.map((p) => (
+                <button class="chip chip-toggle chip-toggle-platform" type="button" aria-pressed="false" data-platform={p.slug}>
+                  {loc(p.name)}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        )
+      }
+    </div>
+    <div class="sheet-foot">
+      <button class="btn btn-ghost" type="button" data-reset>{t('catalog.reset')}</button>
+      <button class="btn btn-primary apply" type="button" data-close-filters data-apply-label>
+        {t('catalog.showResults', { n: games.length })}
+      </button>
+    </div>
+  </div>
+
+  <div class="active" data-active hidden>
+    <ul class="active-list" role="list" data-active-list></ul>
+    <button class="reset-link" type="button" data-reset>{t('catalog.reset')}</button>
+  </div>
+
+  <div class="grid" data-grid>
+    {initial.map((game) => <GameCard game={game} taxonomy={taxonomy} />)}
+  </div>
+
+  <!-- Игры есть, но по запросу/фильтрам ничего не нашлось -->
+  <div class="no-matches" data-empty hidden>
+    <EmptyState title={t('catalog.noMatchesTitle')}>
+      <SubmitGameButton variant="inline" />
+      <button class="btn btn-ghost" type="button" data-reset>{t('catalog.reset')}</button>
+    </EmptyState>
+  </div>
+
+  <div class="more-wrap">
+    <button class="btn btn-ghost" type="button" data-more hidden>{t('catalog.showMore')}</button>
+  </div>
+</section>
+)}
+
+<script>
+  import { pageI18n } from '../i18n';
+  import { normalizeSearch } from '../lib/normalize';
+  import { STATS_EVENT } from '../scripts/stats';
+  import { getHideAdult, setHideAdult } from '../scripts/adult-filter';
+
+  const { t } = pageI18n();
+
+  type Sort = 'new' | 'likes' | 'downloads';
+  const SORTS: Sort[] = ['new', 'likes', 'downloads'];
+
+  const root = document.querySelector<HTMLElement>('[data-catalog]');
+  if (root) initCatalog(root);
+
+  function initCatalog(root: HTMLElement) {
+    const $ = <T extends Element>(sel: string) => root.querySelector<T>(sel)!;
+    const names = JSON.parse(root.dataset.names ?? '{}') as {
+      genres: Record<string, string>;
+      tags: Record<string, string>;
+      platforms: Record<string, string>;
+    };
+    const pageSize = Number(root.dataset.pageSize) || 8;
+
+    const grid = $<HTMLElement>('[data-grid]');
+    const cards = [...grid.querySelectorAll<HTMLElement>('[data-game]')].map((el) => ({
+      el,
+      search: el.dataset.search ?? '',
+      genres: (el.dataset.genres ?? '').split(' ').filter(Boolean),
+      tags: (el.dataset.tags ?? '').split(' ').filter(Boolean),
+      platforms: (el.dataset.platforms ?? '').split(' ').filter(Boolean),
+      likes: Number(el.dataset.likes),
+      downloads: Number(el.dataset.downloads),
+      published: el.dataset.published ?? '',
+      adult: el.dataset.adult === '1',
+    }));
+    const hideAdultBox = $<HTMLInputElement>('[data-hide-adult]');
+
+    const qInput = $<HTMLInputElement>('[data-q]');
+    const clearQ = $<HTMLButtonElement>('[data-clear-q]');
+    const sortSelect = $<HTMLSelectElement>('[data-sort]');
+    const panel = $<HTMLElement>('[data-panel]');
+    const backdrop = $<HTMLElement>('[data-backdrop]');
+    const openBtn = $<HTMLButtonElement>('[data-open-filters]');
+    const filterCount = $<HTMLElement>('[data-filter-count]');
+    const applyBtn = $<HTMLButtonElement>('[data-apply-label]');
+    const active = $<HTMLElement>('[data-active]');
+    const activeList = $<HTMLElement>('[data-active-list]');
+    const countEl = $<HTMLElement>('[data-count]');
+    const empty = $<HTMLElement>('[data-empty]');
+    const moreBtn = $<HTMLButtonElement>('[data-more]');
+    const headerInput = document.querySelector<HTMLInputElement>('#header-q');
+    const mobileSheet = window.matchMedia('(max-width: 767px)');
+
+    // ---------- Состояние (зеркалируется в адресной строке) ----------
+    const params = new URLSearchParams(location.search);
+    const state = {
+      q: params.get('q') ?? '',
+      genres: new Set(params.getAll('genre').filter((s) => s in names.genres)),
+      tags: new Set(params.getAll('tag').filter((s) => s in names.tags)),
+      platforms: new Set(params.getAll('os').filter((s) => s in (names.platforms ?? {}))),
+      sort: (SORTS.includes(params.get('sort') as Sort) ? params.get('sort') : 'new') as Sort,
+      limit: pageSize,
+      // «Не показывать игры 18+» — личная настройка посетителя (хранится в браузере, не в адресе)
+      hideAdult: getHideAdult(),
+    };
+
+    function matches(card: (typeof cards)[number]) {
+      if (state.hideAdult && card.adult) return false;
+      const terms = normalizeSearch(state.q).split(' ').filter(Boolean);
+      if (!terms.every((term) => card.search.includes(term))) return false;
+      // Жанры: любой из выбранных. Теги: все выбранные.
+      if (state.genres.size && !card.genres.some((g) => state.genres.has(g))) return false;
+      for (const tag of state.tags) if (!card.tags.includes(tag)) return false;
+      // Платформы: любая из выбранных (Windows или Linux)
+      if (state.platforms.size && !card.platforms.some((p) => state.platforms.has(p))) return false;
+      return true;
+    }
+
+    function compare(a: (typeof cards)[number], b: (typeof cards)[number]) {
+      const byNew = b.published.localeCompare(a.published);
+      if (state.sort === 'likes') return b.likes - a.likes || byNew;
+      if (state.sort === 'downloads') return b.downloads - a.downloads || byNew;
+      return byNew;
+    }
+
+    function render() {
+      const result = cards.filter(matches).sort(compare);
+      const visible = new Set(result.slice(0, state.limit));
+
+      // Переставляем карточки в нужном порядке; остальные прячем
+      for (const card of [...result, ...cards.filter((c) => !result.includes(c))]) {
+        grid.append(card.el);
+        card.el.hidden = !visible.has(card);
+      }
+
+      const n = result.length;
+      countEl.textContent = t('catalog.found', { n });
+      applyBtn.textContent = t('catalog.showResults', { n });
+      empty.hidden = n > 0;
+      grid.hidden = n === 0;
+      moreBtn.hidden = n <= state.limit;
+
+      // Кнопки-чипы в панели фильтров
+      root.querySelectorAll<HTMLButtonElement>('[data-genre]').forEach((b) => b.setAttribute('aria-pressed', String(state.genres.has(b.dataset.genre!))));
+      root.querySelectorAll<HTMLButtonElement>('[data-tag]').forEach((b) => b.setAttribute('aria-pressed', String(state.tags.has(b.dataset.tag!))));
+      root
+        .querySelectorAll<HTMLButtonElement>('[data-platform]')
+        .forEach((b) => b.setAttribute('aria-pressed', String(state.platforms.has(b.dataset.platform!))));
+
+      hideAdultBox.checked = state.hideAdult;
+      const selected = state.genres.size + state.tags.size + state.platforms.size + (state.hideAdult ? 1 : 0);
+      filterCount.hidden = selected === 0;
+      filterCount.textContent = String(selected);
+
+      // Строка активных фильтров
+      activeList.replaceChildren(
+        ...[...state.genres].map((s) => activeChip('genre', s, names.genres[s])),
+        ...[...state.tags].map((s) => activeChip('tag', s, names.tags[s])),
+        ...[...state.platforms].map((s) => activeChip('platform', s, names.platforms[s])),
+      );
+      active.hidden = selected === 0 && !state.q;
+      if (state.q) activeList.prepend(activeChip('q', state.q, `«${state.q}»`));
+      if (state.hideAdult) activeList.append(activeChip('adult', '', t('catalog.noAdultChip')));
+
+      clearQ.hidden = !state.q;
+      if (qInput.value !== state.q) qInput.value = state.q;
+      if (headerInput && headerInput.value !== state.q) headerInput.value = state.q;
+      sortSelect.value = state.sort;
+      syncUrl();
+    }
+
+    function activeChip(kind: 'genre' | 'tag' | 'platform' | 'q' | 'adult', slug: string, label: string) {
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `chip active-chip${kind === 'genre' ? ' chip-genre' : kind === 'platform' ? ' active-platform' : ''}`;
+      btn.setAttribute('aria-label', `${t('catalog.removeFilter')}: ${label}`);
+      btn.innerHTML = `<span></span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m8 8 8 8M16 8l-8 8"/></svg>`;
+      btn.querySelector('span')!.textContent = label;
+      btn.addEventListener('click', () => {
+        if (kind === 'genre') state.genres.delete(slug);
+        else if (kind === 'tag') state.tags.delete(slug);
+        else if (kind === 'platform') state.platforms.delete(slug);
+        else if (kind === 'adult') {
+          state.hideAdult = false;
+          setHideAdult(false);
+        } else state.q = '';
+        state.limit = pageSize;
+        render();
+      });
+      li.append(btn);
+      return li;
+    }
+
+    function syncUrl() {
+      const p = new URLSearchParams();
+      if (state.q) p.set('q', state.q);
+      state.genres.forEach((g) => p.append('genre', g));
+      state.tags.forEach((tg) => p.append('tag', tg));
+      state.platforms.forEach((os) => p.append('os', os));
+      if (state.sort !== 'new') p.set('sort', state.sort);
+      const qs = p.toString();
+      history.replaceState(null, '', `${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`);
+    }
+
+    function resetAll() {
+      state.q = '';
+      state.genres.clear();
+      state.tags.clear();
+      state.platforms.clear();
+      state.limit = pageSize;
+      render();
+    }
+
+    // ---------- Панель фильтров: на компьютере раскрывается, на телефоне — шторка снизу ----------
+    function setPanel(open: boolean) {
+      panel.hidden = !open;
+      openBtn.setAttribute('aria-expanded', String(open));
+      const sheet = open && mobileSheet.matches;
+      backdrop.hidden = !sheet;
+      document.documentElement.classList.toggle('no-scroll', sheet);
+    }
+    openBtn.addEventListener('click', () => setPanel(panel.hidden === true));
+    root.querySelectorAll('[data-close-filters]').forEach((b) => b.addEventListener('click', () => setPanel(false)));
+    backdrop.addEventListener('click', () => setPanel(false));
+    document.addEventListener('keydown', (e) => e.key === 'Escape' && !panel.hidden && setPanel(false));
+    mobileSheet.addEventListener('change', () => !panel.hidden && setPanel(true));
+
+    root.querySelectorAll<HTMLButtonElement>('[data-genre]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const s = b.dataset.genre!;
+        state.genres.has(s) ? state.genres.delete(s) : state.genres.add(s);
+        state.limit = pageSize;
+        render();
+      }),
+    );
+    root.querySelectorAll<HTMLButtonElement>('[data-tag]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const s = b.dataset.tag!;
+        state.tags.has(s) ? state.tags.delete(s) : state.tags.add(s);
+        state.limit = pageSize;
+        render();
+      }),
+    );
+    root.querySelectorAll<HTMLButtonElement>('[data-platform]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const s = b.dataset.platform!;
+        state.platforms.has(s) ? state.platforms.delete(s) : state.platforms.add(s);
+        state.limit = pageSize;
+        render();
+      }),
+    );
+    root.querySelectorAll('[data-reset]').forEach((b) => b.addEventListener('click', resetAll));
+
+    // «Не показывать игры 18+»: «Сбросить всё» эту настройку не трогает — это личный выбор посетителя
+    hideAdultBox.addEventListener('change', () => {
+      state.hideAdult = hideAdultBox.checked;
+      setHideAdult(state.hideAdult);
+      state.limit = pageSize;
+      render();
+    });
+
+    // ---------- Поиск ----------
+    let timer = 0;
+    qInput.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        state.q = qInput.value.trim();
+        state.limit = pageSize;
+        render();
+      }, 150);
+    });
+    clearQ.addEventListener('click', () => {
+      state.q = '';
+      render();
+      qInput.focus();
+    });
+
+    // Поиск из шапки на главной работает без перезагрузки страницы
+    document.querySelectorAll<HTMLFormElement>('form[data-site-search]').forEach((form) =>
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = form.querySelector<HTMLInputElement>('input[name="q"]');
+        state.q = (input?.value ?? '').trim();
+        state.limit = pageSize;
+        render();
+        document.querySelector('[data-header]')?.classList.remove('search-open');
+        input?.blur();
+        root.scrollIntoView({ behavior: 'smooth' });
+      }),
+    );
+
+    sortSelect.addEventListener('change', () => {
+      state.sort = sortSelect.value as Sort;
+      render();
+    });
+
+    moreBtn.addEventListener('click', () => {
+      state.limit += pageSize;
+      render();
+    });
+
+    // Клик по жанру/тегу/платформе на карточке или в «Игре недели» — сразу фильтр каталога
+    document.addEventListener('click', (e) => {
+      const link = (e.target as Element).closest<HTMLAnchorElement>('[data-filter-genre], [data-filter-tag], [data-filter-platform]');
+      if (!link || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      e.preventDefault();
+      if (link.dataset.filterGenre) state.genres.add(link.dataset.filterGenre);
+      if (link.dataset.filterTag) state.tags.add(link.dataset.filterTag);
+      if (link.dataset.filterPlatform) state.platforms.add(link.dataset.filterPlatform);
+      state.limit = pageSize;
+      render();
+      root.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    render();
+
+    // Пришли настоящие лайки/скачивания из базы — обновляем данные карточек и порядок сортировки
+    document.addEventListener(STATS_EVENT, () => {
+      for (const card of cards) {
+        card.likes = Number(card.el.dataset.likes) || 0;
+        card.downloads = Number(card.el.dataset.downloads) || 0;
+      }
+      if (state.sort !== 'new') render();
+    });
+
+    // Переход со страницы игры по жанру/тегу (/?tag=…#catalog) — сразу показываем каталог
+    // (после события load: иначе браузер успевает вернуть прокрутку наверх)
+    if (location.hash === '#catalog') {
+      const go = () => setTimeout(() => root.scrollIntoView({ behavior: 'instant' }), 0);
+      if (document.readyState === 'complete') go();
+      else window.addEventListener('load', go, { once: true });
+    }
+  }
+</script>
+
+<style>
+  .catalog {
+    padding-top: 3rem;
+  }
+
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .head h2 {
+    font-size: var(--fs-xl);
+    font-weight: 800;
+    color: var(--brand);
+  }
+
+  .count {
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+  }
+
+  /* ---------- Панель инструментов ---------- */
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.6rem;
+  }
+
+  .search {
+    position: relative;
+    grid-column: 1 / -1;
+  }
+
+  .search input {
+    width: 100%;
+    height: 48px;
+    padding: 0 2.75rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface-1);
+    transition: border-color var(--t-fast) var(--ease);
+  }
+
+  .search input::-webkit-search-cancel-button {
+    display: none;
+  }
+
+  .search input::placeholder {
+    color: var(--text-faint);
+  }
+
+  .search input:focus {
+    outline: none;
+    border-color: var(--brand);
+  }
+
+  .search :global(.search-icon) {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    translate: 0 -50%;
+    color: var(--text-faint);
+    pointer-events: none;
+  }
+
+  .clear {
+    position: absolute;
+    right: 0.25rem;
+    top: 50%;
+    translate: 0 -50%;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+  }
+
+  .clear:hover {
+    color: var(--brand);
+  }
+
+  .clear[hidden] {
+    display: none;
+  }
+
+  .filters-btn {
+    height: 48px;
+  }
+
+  .filter-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.4rem;
+    height: 1.4rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--brand);
+    color: var(--text-on-brand);
+    font-size: var(--fs-xs);
+    font-weight: 800;
+  }
+
+  .filter-count[hidden] {
+    display: none;
+  }
+
+  .sort {
+    position: relative;
+  }
+
+  .sort select {
+    appearance: none;
+    width: 100%;
+    height: 48px;
+    padding: 0 2.5rem 0 1rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .sort select:hover {
+    border-color: var(--border-strong);
+  }
+
+  .sort select:focus-visible {
+    outline: 2px solid var(--brand);
+  }
+
+  .sort :global(.sort-chevron) {
+    position: absolute;
+    right: 0.85rem;
+    top: 50%;
+    translate: 0 -50%;
+    color: var(--brand);
+    pointer-events: none;
+  }
+
+  /* ---------- Панель фильтров ---------- */
+  .panel {
+    margin-top: 0.75rem;
+    padding: 1.25rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface-1);
+  }
+
+  .groups {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  legend {
+    padding: 0;
+    margin-bottom: 0.6rem;
+    font-weight: 800;
+    font-size: var(--fs-sm);
+  }
+
+  legend small {
+    color: var(--text-faint);
+    font-weight: 500;
+  }
+
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Галочка «Не показывать игры 18+» в фирменном стиле */
+  .adult-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: var(--tap);
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .adult-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+  }
+
+  .adult-toggle .box {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 6px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface-2);
+    transition:
+      background-color var(--t-fast) var(--ease),
+      border-color var(--t-fast) var(--ease);
+  }
+
+  .adult-toggle .box::after {
+    content: '';
+    width: 0.4rem;
+    height: 0.7rem;
+    margin-top: -0.15rem;
+    border: solid var(--text-on-brand);
+    border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg) scale(0);
+    transition: transform var(--t-fast) var(--ease);
+  }
+
+  .adult-toggle input:checked + .box {
+    background: var(--brand-gradient);
+    border-color: transparent;
+  }
+
+  .adult-toggle input:checked + .box::after {
+    transform: rotate(45deg) scale(1);
+  }
+
+  .adult-toggle input:focus-visible + .box {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+
+  .adult-toggle:hover .box {
+    border-color: var(--brand-line);
+  }
+
+  .chip-toggle {
+    min-height: 36px;
+    padding: 0.35rem 0.85rem;
+    font-size: var(--fs-sm);
+  }
+
+  .chip-toggle[aria-pressed='true'] {
+    background: var(--brand-gradient);
+    border-color: transparent;
+    color: var(--text-on-brand);
+  }
+
+  /* Платформы в фильтрах — синие */
+  .chip-toggle-platform {
+    color: var(--platform);
+    border-color: var(--platform-line);
+    background: var(--platform-soft);
+  }
+
+  .chip-toggle-platform[aria-pressed='true'] {
+    background: var(--platform);
+    border-color: transparent;
+    color: #000;
+  }
+
+  .active-list :global(.active-chip.active-platform) {
+    color: var(--platform);
+    border-color: var(--platform-line);
+    background: var(--platform-soft);
+  }
+
+  .sheet-head {
+    display: none;
+  }
+
+  .sheet-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-top: 1.25rem;
+  }
+
+  .sheet-foot .apply {
+    display: none;
+  }
+
+  .icon-btn {
+    display: grid;
+    place-items: center;
+    width: var(--tap);
+    height: var(--tap);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    font-size: 1.25rem;
+  }
+
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgb(0 0 0 / 0.7);
+  }
+
+  /* На телефоне фильтры — шторка снизу с кнопкой «Показать N игр» */
+  @media (max-width: 767px) {
+    .panel {
+      position: fixed;
+      inset: auto 0 0 0;
+      z-index: 100;
+      max-height: 85dvh;
+      margin: 0;
+      padding: 0 var(--gutter) calc(1rem + env(safe-area-inset-bottom));
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      display: flex;
+      flex-direction: column;
+      animation: sheet-in var(--t) var(--ease);
+    }
+    .panel[hidden] {
+      display: none;
+    }
+    .sheet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-block: 0.5rem;
+      font-weight: 800;
+      font-size: var(--fs-lg);
+      border-bottom: 1px solid var(--border);
+    }
+    .groups {
+      overflow-y: auto;
+      padding-block: 1rem;
+      overscroll-behavior: contain;
+    }
+    .sheet-foot {
+      margin-top: 0;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .sheet-foot .btn {
+      flex: 1;
+    }
+    .sheet-foot .apply {
+      display: inline-flex;
+    }
+  }
+
+  @keyframes sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+  }
+
+  :global(html.no-scroll) {
+    overflow: hidden;
+  }
+
+  /* ---------- Активные фильтры ---------- */
+  .active {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-top: 0.9rem;
+  }
+
+  .active[hidden] {
+    display: none;
+  }
+
+  .active-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .active-list :global(.active-chip) {
+    min-height: 32px;
+    padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+    font-size: var(--fs-sm);
+    color: var(--text);
+    border-color: var(--brand-line);
+    background: var(--brand-soft);
+  }
+
+  .reset-link {
+    min-height: 32px;
+    border: 0;
+    background: none;
+    color: var(--brand);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* ---------- Сетка карточек: 1 / 2 / 3 / 4 колонки ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+
+  .grid[hidden],
+  .grid > :global([hidden]) {
+    display: none;
+  }
+
+  @media (min-width: 600px) {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .toolbar {
+      grid-template-columns: 1fr auto 220px;
+    }
+    .search {
+      grid-column: auto;
+    }
+    .grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .no-matches {
+    margin-top: 1.25rem;
+  }
+
+  .no-matches[hidden] {
+    display: none;
+  }
+
+  .more-wrap {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+  }
+
+  .more-wrap .btn {
+    min-width: 220px;
+  }
+
+  .more-wrap .btn[hidden] {
+    display: none;
+  }
+</style>

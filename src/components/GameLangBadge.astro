@@ -1,0 +1,45 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import { useI18n } from '../i18n';
+
+/** Плашка языков игры «RU / EN» — в левом верхнем углу обложки. */
+interface Props {
+  languages: string[];
+}
+const { languages } = Astro.props;
+const { t } = useI18n(Astro);
+---
+
+{
+  languages.length > 0 && (
+    <span class="lang-badge" title={`${t('game.languages')}: ${languages.join(', ')}`}>
+      {languages.join(' / ')}
+    </span>
+  )
+}
+
+<style>
+  .lang-badge {
+    position: absolute;
+    top: 0.6rem;
+    left: 0.6rem;
+    z-index: 1;
+    display: inline-grid;
+    place-items: center;
+    height: 1.6rem;
+    padding: 0 0.5rem;
+    border-radius: 6px;
+    border: 1.5px solid var(--brand-line);
+    background: rgb(0 0 0 / 0.78);
+    color: var(--text);
+    font-size: var(--fs-xs);
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+</style>

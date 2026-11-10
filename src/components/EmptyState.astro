@@ -1,0 +1,115 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import { siteConfig } from '../config/site';
+
+/**
+ * Пустое состояние / сообщение об ошибке в фирменном стиле.
+ *
+ * Место под маскота Kaviku: картинка задаётся в src/config/site.ts → mascotImage.
+ * Пока она не задана, блок не показывается и места не занимает.
+ * Кнопки и дополнительный текст передаются через <slot />.
+ */
+interface Props {
+  title: string;
+  text?: string;
+  /** h1 для отдельных страниц (404), h2/p — внутри каталога. */
+  headingLevel?: 'h1' | 'h2' | 'p';
+  framed?: boolean;
+  /** Другая картинка маскота (например, для 404). По умолчанию — siteConfig.mascotImage. */
+  image?: string;
+  /** large — крупная картинка для отдельной страницы. */
+  size?: 'md' | 'large';
+  /** alt для картинки, если она несёт смысл (как «404»). */
+  imageAlt?: string;
+  class?: string;
+}
+const { title, text, headingLevel = 'p', framed = true, image, size = 'md', imageAlt = '', class: className = '' } = Astro.props;
+const Heading = headingLevel;
+const mascot = image || siteConfig.mascotImage;
+---
+
+<div class:list={['empty-state', { framed }, className]}>
+  {
+    mascot && (
+      <div class:list={['mascot', size]}>
+        <img src={mascot} alt={imageAlt} width="1536" height="1024" loading={size === 'large' ? 'eager' : 'lazy'} decoding="async" />
+      </div>
+    )
+  }
+  <Heading class="title">{title}</Heading>
+  {text && <p class="text">{text}</p>}
+  <div class="actions">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 3rem 1.25rem;
+    text-align: center;
+    color: var(--text-muted);
+  }
+
+  .framed {
+    border-radius: var(--radius-lg);
+    border: 1px dashed var(--border-strong);
+    background:
+      radial-gradient(70% 90% at 50% 0%, rgb(255 122 20 / 0.08), transparent 70%),
+      var(--surface-1);
+  }
+
+  /* Маскот: горизонтальная картинка 3:2, вписывается без искажений */
+  .mascot {
+    width: min(360px, 80vw);
+    aspect-ratio: 3 / 2;
+    margin-block: -1.5rem -0.75rem; /* у картинки собственные поля — компенсируем */
+  }
+
+  .mascot.large {
+    width: min(520px, 92vw);
+    margin-block: -2rem -1rem;
+  }
+
+  .mascot img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    /* Края картинки мягко растворяются в фоне — не видно прямоугольника
+       тёмного фона файла. Сам файл не меняется. */
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 58%, transparent 74%);
+    mask-image: radial-gradient(ellipse at center, #000 58%, transparent 74%);
+  }
+
+  .title {
+    margin: 0;
+    font-size: var(--fs-xl);
+    font-weight: 800;
+    line-height: 1.25;
+    color: var(--text);
+  }
+
+  .text {
+    max-width: 46ch;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .actions:empty {
+    display: none;
+  }
+</style>

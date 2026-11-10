@@ -1,0 +1,528 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import { Image, getImage } from 'astro:assets';
+import Icon from './Icon.astro';
+import type { GameImage } from '../data/types';
+import { parseVideoUrl } from '../lib/video';
+import { useI18n } from '../i18n';
+
+/**
+ * Галерея видео и скриншотов: лента, которую можно листать (свайп, колесо, стрелки),
+ * и просмотр в полном размере с переключением (стрелки, свайп, клавиши ← → Esc).
+ * Видео идут первыми; плеер загружается только при открытии (без лишнего трафика).
+ * Если нет ни видео, ни скриншотов — компонент ничего не выводит.
+ */
+interface Props {
+  title: string;
+  screenshots: GameImage[];
+  videos?: string[];
+  /** Обложка — превью для видео, у которых сервис не даёт своей картинки (VK, Rutube, файл). */
+  cover?: GameImage;
+}
+const { title, screenshots, videos = [], cover } = Astro.props;
+const { t } = useI18n(Astro);
+
+const coverThumb = cover ? (typeof cover === 'string' ? cover : (await getImage({ src: cover, width: Math.min(cover.width, 800), format: 'webp' })).src) : undefined;
+const clips = videos
+  .map((url) => parseVideoUrl(url))
+  .filter((v) => v !== undefined)
+  .map((v) => ({ ...v, poster: v.thumb ?? coverThumb }));
+
+// Полноразмерные версии для просмотра (WebP, не шире 1920px)
+const shots = await Promise.all(
+  screenshots.map(async (src, i) => {
+    const alt = t('game.screenshotAlt', { title, n: i + 1 });
+    if (typeof src === 'string') return { src, alt, full: src, widths: [] };
+    const full = await getImage({ src, width: Math.min(src.width, 1920), format: 'webp', quality: 85 });
+    const widths = [...new Set([480, 800, 1200].filter((w) => w < src.width).concat(Math.min(src.width, 1200)))];
+    return { src, alt, full: full.src, widths };
+  }),
+);
+const total = clips.length + shots.length;
+---
+
+{
+  total > 0 && (
+    <div class:list={['gallery', { single: total === 1 }]} data-gallery>
+      <div class="track" data-track tabindex="0" aria-label={t('game.screenshots')}>
+        {clips.map((v, i) => (
+          <button class="shot video" type="button" data-embed={v.embed} data-video-kind={v.kind} aria-label={t('game.watchVideo', { n: i + 1 })}>
+            {v.poster ? <img src={v.poster} alt="" loading="lazy" decoding="async" class="poster" /> : <span class="poster-empty" />}
+            <span class="play" aria-hidden="true">
+              <Icon name="play" />
+            </span>
+            <span class="video-label">{t('game.video')}</span>
+          </button>
+        ))}
+        {shots.map((s, i) => (
+          <button class="shot" type="button" data-index={i} data-full={s.full} aria-label={t('game.openScreenshot', { n: i + 1 })}>
+            {typeof s.src === 'string' ? (
+              <img src={s.src} alt={s.alt} loading="lazy" decoding="async" />
+            ) : (
+              <Image
+                src={s.src}
+                alt={s.alt}
+                widths={s.widths}
+                sizes={total === 1 ? '(min-width: 1040px) 1000px, 100vw' : '(min-width: 1040px) 500px, 85vw'}
+                format="webp"
+                quality={80}
+                loading="lazy"
+              />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {total > 1 && (
+        <div class="nav">
+          <button class="arrow" type="button" data-prev aria-label={t('game.prev')}>
+            <Icon name="arrow-right" class="flip" />
+          </button>
+          <span class="count" data-count aria-live="polite">{t('game.screenshotCounter', { n: 1, total })}</span>
+          <button class="arrow" type="button" data-next aria-label={t('game.next')}>
+            <Icon name="arrow-right" />
+          </button>
+        </div>
+      )}
+
+      <dialog class="viewer" data-viewer aria-label={t('game.screenshots')}>
+        <img data-viewer-img alt="" />
+        <div class="v-media" data-v-media hidden />
+
+        <button class="v-btn v-close" type="button" data-close aria-label={t('common.close')}>
+          <Icon name="close" />
+        </button>
+        {total > 1 && (
+          <>
+            <button class="v-btn v-prev" type="button" data-v-prev aria-label={t('game.prev')}>
+              <Icon name="arrow-right" class="flip" />
+            </button>
+            <button class="v-btn v-next" type="button" data-v-next aria-label={t('game.next')}>
+              <Icon name="arrow-right" />
+            </button>
+            <span class="v-count" data-v-count />
+          </>
+        )}
+      </dialog>
+    </div>
+  )
+}
+
+<script>
+  import { pageI18n } from '../i18n';
+
+  const { t } = pageI18n();
+
+  document.querySelectorAll<HTMLElement>('[data-gallery]').forEach((gallery) => {
+    const track = gallery.querySelector<HTMLElement>('[data-track]')!;
+    const shots = [...gallery.querySelectorAll<HTMLButtonElement>('.shot')];
+    const total = shots.length;
+    const count = gallery.querySelector<HTMLElement>('[data-count]');
+    const viewer = gallery.querySelector<HTMLDialogElement>('[data-viewer]')!;
+    const viewerImg = viewer.querySelector<HTMLImageElement>('[data-viewer-img]')!;
+    const viewerCount = viewer.querySelector<HTMLElement>('[data-v-count]');
+    const viewerMedia = viewer.querySelector<HTMLElement>('[data-v-media]')!;
+    let current = 0;
+
+    // ---------- Лента ----------
+    const currentInTrack = () => {
+      const left = track.scrollLeft;
+      let best = 0;
+      shots.forEach((s, i) => {
+        if (Math.abs(s.offsetLeft - track.offsetLeft - left) < Math.abs(shots[best].offsetLeft - track.offsetLeft - left)) best = i;
+      });
+      return best;
+    };
+    const scrollToShot = (i: number) => {
+      const target = shots[Math.max(0, Math.min(total - 1, i))];
+      track.scrollTo({ left: target.offsetLeft - track.offsetLeft, behavior: 'smooth' });
+    };
+    /** Номера скриншотов, которые сейчас видны в ленте (виден хотя бы на 60%). */
+    const visibleRange = () => {
+      const box = track.getBoundingClientRect();
+      const seen = shots
+        .map((s, i) => {
+          const r = s.getBoundingClientRect();
+          const visible = Math.min(r.right, box.right) - Math.max(r.left, box.left);
+          return visible >= r.width * 0.6 ? i : -1;
+        })
+        .filter((i) => i >= 0);
+      const first = seen.length ? seen[0] : currentInTrack();
+      return { from: first + 1, to: (seen.length ? seen[seen.length - 1] : first) + 1 };
+    };
+    // «1 из 6», а если видно сразу несколько — «1 / 2 из 6»
+    const updateCount = () => {
+      if (!count) return;
+      const { from, to } = visibleRange();
+      count.textContent =
+        from === to ? t('game.screenshotCounter', { n: from, total }) : t('game.screenshotRange', { from, to, total });
+    };
+    track.addEventListener('scroll', updateCount, { passive: true });
+    window.addEventListener('resize', updateCount);
+    updateCount();
+    gallery.querySelector('[data-prev]')?.addEventListener('click', () => scrollToShot(currentInTrack() - 1));
+    gallery.querySelector('[data-next]')?.addEventListener('click', () => scrollToShot(currentInTrack() + 1));
+    track.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') scrollToShot(currentInTrack() + 1);
+      if (e.key === 'ArrowLeft') scrollToShot(currentInTrack() - 1);
+    });
+
+    // ---------- Просмотр в полном размере ----------
+    /** Убирает плеер — видео останавливается. */
+    const stopVideo = () => {
+      viewerMedia.replaceChildren();
+      viewerMedia.hidden = true;
+    };
+    const show = (i: number) => {
+      current = (i + total) % total;
+      const shot = shots[current];
+      stopVideo();
+      if (shot.dataset.embed) {
+        // Видео: iframe сервиса (YouTube, VK, Rutube) или обычный плеер для файла .mp4/.webm
+        let player: HTMLElement;
+        if (shot.dataset.videoKind === 'file') {
+          const video = document.createElement('video');
+          video.src = shot.dataset.embed;
+          video.controls = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          player = video;
+        } else {
+          const frame = document.createElement('iframe');
+          frame.src = shot.dataset.embed;
+          frame.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture';
+          frame.allowFullscreen = true;
+          frame.referrerPolicy = 'strict-origin-when-cross-origin';
+          frame.title = shot.getAttribute('aria-label') ?? '';
+          player = frame;
+        }
+        viewerMedia.append(player);
+        viewerMedia.hidden = false;
+        viewerImg.hidden = true;
+        viewerImg.removeAttribute('src');
+      } else {
+        viewerImg.hidden = false;
+        viewerImg.src = shot.dataset.full!;
+        viewerImg.alt = shot.querySelector('img')?.alt ?? '';
+      }
+      if (viewerCount) viewerCount.textContent = t('game.screenshotCounter', { n: current + 1, total });
+    };
+    shots.forEach((s, i) =>
+      s.addEventListener('click', () => {
+        show(i);
+        viewer.showModal();
+        document.documentElement.classList.add('no-scroll');
+      }),
+    );
+    viewer.addEventListener('close', () => {
+      stopVideo();
+      document.documentElement.classList.remove('no-scroll');
+      scrollToShot(current);
+    });
+    viewer.querySelector('[data-close]')!.addEventListener('click', () => viewer.close());
+    viewer.querySelector('[data-v-prev]')?.addEventListener('click', () => show(current - 1));
+    viewer.querySelector('[data-v-next]')?.addEventListener('click', () => show(current + 1));
+    // Клик по затемнённому фону закрывает просмотр
+    viewer.addEventListener('click', (e) => {
+      if (e.target === viewer) viewer.close();
+    });
+    viewer.addEventListener('keydown', (e) => {
+      if (total < 2) return;
+      if (e.key === 'ArrowRight') show(current + 1);
+      if (e.key === 'ArrowLeft') show(current - 1);
+    });
+    // Свайп на телефоне
+    let startX = 0;
+    viewer.addEventListener('pointerdown', (e) => (startX = e.clientX));
+    viewer.addEventListener('pointerup', (e) => {
+      if (viewerMedia.contains(e.target as Node)) return; // не мешаем перематывать видео
+      const dx = e.clientX - startX;
+      if (total > 1 && Math.abs(dx) > 50) show(current + (dx < 0 ? 1 : -1));
+    });
+  });
+</script>
+
+<style>
+  .gallery {
+    position: relative;
+  }
+
+  .track {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    border-radius: var(--radius);
+  }
+
+  .track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shot {
+    flex: 0 0 85%;
+    aspect-ratio: 16 / 9;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--bg);
+    scroll-snap-align: start;
+    cursor: zoom-in;
+    transition: border-color var(--t-fast) var(--ease);
+  }
+
+  .shot:hover,
+  .shot:focus-visible {
+    border-color: var(--brand-line);
+  }
+
+  /* Скриншот целиком, без обрезки краёв (интерфейс игры не теряется) */
+  .shot :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: transform 400ms var(--ease);
+  }
+
+  @media (hover: hover) {
+    .shot:hover :global(img) {
+      transform: scale(1.03);
+    }
+  }
+
+  .single .shot {
+    flex-basis: 100%;
+  }
+
+  /* ---------- Видео в ленте ---------- */
+  .video {
+    position: relative;
+    cursor: pointer;
+  }
+
+  .video .poster {
+    object-fit: cover;
+    opacity: 0.75;
+  }
+
+  .poster-empty {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(90% 90% at 100% 0%, rgb(255 148 24 / 0.22), transparent 60%),
+      var(--surface-1);
+  }
+
+  .play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 999px;
+    background: var(--brand-gradient);
+    color: var(--text-on-brand);
+    font-size: 1.7rem;
+    box-shadow: var(--glow-brand);
+    transition: transform var(--t) var(--ease);
+  }
+
+  .play :global(.icon) {
+    margin-left: 3px; /* треугольник визуально по центру */
+  }
+
+  .video:hover .play,
+  .video:focus-visible .play {
+    transform: scale(1.08);
+  }
+
+  .video-label {
+    position: absolute;
+    left: 0.6rem;
+    bottom: 0.6rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 0.75);
+    color: var(--text);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+  }
+
+  @media (min-width: 768px) {
+    .shot {
+      flex-basis: calc(50% - 0.375rem);
+    }
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 0.85rem;
+  }
+
+  .arrow {
+    display: grid;
+    place-items: center;
+    width: var(--tap);
+    height: var(--tap);
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 1.1rem;
+    transition:
+      border-color var(--t-fast) var(--ease),
+      color var(--t-fast) var(--ease);
+  }
+
+  .arrow:hover {
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+
+  .count {
+    min-width: 4.5rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .gallery :global(.flip) {
+    transform: scaleX(-1);
+  }
+
+  /* ---------- Просмотр в полном размере ---------- */
+  .viewer {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  .viewer[open] {
+    display: grid;
+    place-items: center;
+  }
+
+  .viewer::backdrop {
+    background: rgb(0 0 0 / 0.92);
+  }
+
+  .viewer img {
+    /* место по бокам под стрелки, чтобы они не закрывали картинку */
+    max-width: min(100vw - 9rem, 1600px);
+    max-height: calc(100dvh - 7rem);
+    border-radius: var(--radius);
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  .viewer img[hidden],
+  .v-media[hidden] {
+    display: none;
+  }
+
+  /* Плеер видео: 16:9, с местом по бокам под стрелки */
+  .v-media {
+    width: min(100vw - 9rem, 1280px, (100dvh - 7rem) * 16 / 9);
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #000;
+  }
+
+  .v-media :global(iframe),
+  .v-media :global(video) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+
+  .v-btn {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: rgb(0 0 0 / 0.6);
+    color: var(--text);
+    font-size: 1.3rem;
+    transition:
+      border-color var(--t-fast) var(--ease),
+      color var(--t-fast) var(--ease);
+  }
+
+  .v-btn:hover {
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+
+  .v-close {
+    top: 1rem;
+    right: 1rem;
+  }
+
+  .v-prev,
+  .v-next {
+    top: 50%;
+    translate: 0 -50%;
+  }
+
+  .v-prev {
+    left: 1rem;
+  }
+
+  .v-next {
+    right: 1rem;
+  }
+
+  .v-count {
+    position: absolute;
+    bottom: calc(1.25rem + env(safe-area-inset-bottom));
+    left: 50%;
+    translate: -50% 0;
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+  }
+
+  /* На телефоне стрелки внизу, чтобы не закрывать картинку */
+  @media (max-width: 599px) {
+    .viewer img {
+      max-width: calc(100vw - 1.5rem);
+    }
+    .v-media {
+      width: calc(100vw - 1.5rem);
+    }
+    .v-prev,
+    .v-next {
+      top: auto;
+      bottom: calc(0.75rem + env(safe-area-inset-bottom));
+      translate: none;
+    }
+  }
+</style>

@@ -1,0 +1,74 @@
+/*
+ * Kaviku - открытый исходный код / open source (AGPL-3.0)
+ * Сайт: https://kaviku.pages.dev
+ * GitHub: https://github.com/Kaviku-Group/Kaviku
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/*
+ * Фирменная палитра Kaviku.
+ * Оранжевые цвета измерены по пикселям оригинальных логотипов (assets/logo/original).
+ * Нейтральные — оттенки чёрного фона логотипа. Новых цветов не добавлять:
+ * все компоненты берут цвета только отсюда.
+ */
+:root {
+  /* Бренд (из логотипа) */
+  --brand-light: #ff9418; /* блик: верх и правый край знака */
+  --brand: #ff7a14; /* основное тело знака */
+  --brand-deep: #ff5414; /* надпись «Kaviku», низ знака */
+  --brand-gradient: linear-gradient(135deg, var(--brand-light) 0%, var(--brand) 50%, var(--brand-deep) 100%);
+  --brand-soft: rgb(255 122 20 / 0.12); /* фон активных чипов, подсветки */
+  --brand-line: rgb(255 122 20 / 0.45); /* рамки при наведении */
+
+  /* Платформы (Windows, Linux…) — синие чипы. Единственный не фирменный цвет,
+     добавлен по просьбе владельца, чтобы платформы отличались от жанров и тегов. */
+  --platform: #5ea1ff;
+  --platform-soft: rgb(94 161 255 / 0.1);
+  --platform-line: rgb(94 161 255 / 0.4);
+
+  /* Нейтральные (оттенки чёрного фона логотипа) */
+  --bg: #000000; /* фон страницы = фон логотипа, без «коробки» вокруг него */
+  --surface-1: #0e0e0e; /* карточки, панели */
+  --surface-2: #161616; /* поля ввода, вложенные элементы */
+  --surface-3: #1f1f1f; /* наведение на нейтральные элементы */
+  --border: #262626;
+  --border-strong: #3a3a3a;
+
+  /* Текст */
+  --text: #f5f5f5;
+  --text-muted: #a3a3a3;
+  --text-faint: #737373;
+  --text-on-brand: #000000; /* на оранжевом только чёрный: контраст ~8:1 */
+
+  /* Типографика */
+  --font: 'Manrope Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  --fs-2xl: clamp(1.6rem, 1.3rem + 1.4vw, 2.5rem);
+
+  /* Геометрия */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --container: 1240px;
+  --gutter: 16px;
+  --header-h: 64px;
+  --tap: 44px; /* минимальная зона нажатия */
+
+  /* Движение — сдержанно */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 150ms;
+  --t: 220ms;
+  --shadow-card: 0 10px 30px -12px rgb(0 0 0 / 0.9);
+  --glow-brand: 0 6px 24px -8px rgb(255 122 20 / 0.55);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: 24px;
+    --header-h: 80px;
+  }
+}

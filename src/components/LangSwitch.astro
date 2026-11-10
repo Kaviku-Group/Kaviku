@@ -1,0 +1,86 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import { localeList, localizePath, splitLocalePath, useI18n, type Locale } from '../i18n';
+
+/**
+ * Переключатель языка «RU | EN»: ведёт на ту же страницу на другом языке.
+ * Фильтры и поиск каталога (параметры адреса) сохраняются при переключении.
+ */
+const { t, locale } = useI18n(Astro);
+const { path } = splitLocalePath(Astro.url.pathname);
+const label = (l: Locale) => t(`lang.${l}`);
+const fullName = (l: Locale) => t(l === 'ru' ? 'lang.ruName' : 'lang.enName');
+---
+
+<nav class="lang" aria-label={t('lang.label')}>
+  {
+    localeList.map((l) => (
+      <a
+        href={localizePath(l, path)}
+        hreflang={l}
+        lang={l}
+        title={fullName(l)}
+        aria-current={l === locale ? 'true' : undefined}
+        data-lang-link
+      >
+        {label(l)}
+      </a>
+    ))
+  }
+</nav>
+
+<script>
+  // При переключении языка переносим текущие фильтры/поиск (?genre=…&q=…) и якорь,
+  // и запоминаем выбор, чтобы автовыбор по языку браузера больше не переключал
+  document.querySelectorAll<HTMLAnchorElement>('[data-lang-link]').forEach((a) =>
+    a.addEventListener('click', () => {
+      try {
+        localStorage.setItem('kaviku:lang', a.hreflang);
+      } catch {}
+      const url = new URL(a.href);
+      url.search = location.search;
+      url.hash = location.hash;
+      a.href = url.toString();
+    }),
+  );
+</script>
+
+<style>
+  .lang {
+    display: inline-flex;
+    flex: none;
+    padding: 3px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+
+  .lang a {
+    display: grid;
+    place-items: center;
+    min-width: 2.4rem;
+    height: 32px;
+    padding: 0 0.55rem;
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: var(--fs-xs);
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    transition:
+      color var(--t-fast) var(--ease),
+      background-color var(--t-fast) var(--ease);
+  }
+
+  .lang a:hover {
+    color: var(--text);
+  }
+
+  .lang a[aria-current='true'] {
+    background: var(--brand-gradient);
+    color: var(--text-on-brand);
+  }
+</style>

@@ -1,0 +1,66 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import Icon from './Icon.astro';
+import { useI18n } from '../i18n';
+
+/**
+ * Лайки и скачивания игры. Числа из сборки — стартовые;
+ * настоящие значения подставляет src/scripts/stats.ts из базы D1 (/api/stats).
+ */
+interface Props {
+  slug: string;
+  likes: number;
+  downloads: number;
+  size?: 'sm' | 'lg';
+}
+const { slug, likes, downloads, size = 'sm' } = Astro.props;
+const { t, formatCount } = useI18n(Astro);
+---
+
+<dl class:list={['stats', size]} data-stats-slug={slug}>
+  <div title={`${formatCount(likes)} ${t('stats.likes', { n: likes })}`} data-stat-wrap="likes">
+    <dt><Icon name="heart" label={t('stats.likesLabel')} /></dt>
+    <dd data-stat="likes">{formatCount(likes)}</dd>
+  </div>
+  <div title={`${formatCount(downloads)} ${t('stats.downloads', { n: downloads })}`} data-stat-wrap="downloads">
+    <dt><Icon name="download" label={t('stats.downloadsLabel')} /></dt>
+    <dd data-stat="downloads">{formatCount(downloads)}</dd>
+  </div>
+</dl>
+
+<style>
+  .stats {
+    display: flex;
+    gap: 1rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .stats div {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .stats dt {
+    display: flex;
+  }
+  .stats dt :global(.icon) {
+    color: var(--brand);
+  }
+  .stats dd {
+    margin: 0;
+  }
+  .lg {
+    font-size: var(--fs-md);
+    gap: 1.5rem;
+  }
+  .lg dd {
+    color: var(--text);
+  }
+</style>

@@ -1,0 +1,52 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import BaseLayout from '../layouts/BaseLayout.astro';
+import EmptyState from '../components/EmptyState.astro';
+import { siteConfig } from '../config/site';
+import { useI18n } from '../i18n';
+
+/**
+ * Страница «не найдено» (общая для /404 и /en/404):
+ * крупная надпись «404», под ней маскот (siteConfig.notFoundImage), текст и кнопка.
+ */
+const { t, href } = useI18n(Astro);
+const image = siteConfig.notFoundImage;
+---
+
+<BaseLayout title={t('notFound.title')}>
+  <section class="container nf">
+    <p class="code" aria-hidden="true">404</p>
+    <EmptyState
+      title={t('notFound.title')}
+      text={t('notFound.text')}
+      headingLevel="h1"
+      framed={false}
+      image={image}
+      size="large"
+    >
+      <a class="btn btn-primary" href={href('/')}>{t('notFound.back')}</a>
+    </EmptyState>
+  </section>
+</BaseLayout>
+
+<style>
+  .nf {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-block: 2.5rem 1rem;
+  }
+  .code {
+    font-size: clamp(4rem, 15vw, 7rem);
+    font-weight: 800;
+    line-height: 1;
+    background: var(--brand-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+</style>

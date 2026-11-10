@@ -1,0 +1,204 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import Cover from './Cover.astro';
+import GameStats from './GameStats.astro';
+import TaxonomyChips from './TaxonomyChips.astro';
+import AgeBadge from './AgeBadge.astro';
+import GameLangBadge from './GameLangBadge.astro';
+import type { GameSummary } from '../data/types';
+import { resolveGameTaxonomy, type TaxonomyIndex } from '../data/catalog';
+import { normalizeSearch } from '../lib/normalize';
+import { useI18n } from '../i18n';
+import { isAdultRating } from '../scripts/adult-filter';
+import { renderInlineMarkdown } from '../lib/inline-markdown';
+
+interface Props {
+  game: GameSummary;
+  taxonomy: TaxonomyIndex;
+}
+const { game, taxonomy } = Astro.props;
+const { t, loc, href } = useI18n(Astro);
+
+const { genres: genreList, tags: tagList, platforms: platformList } = resolveGameTaxonomy(game, taxonomy);
+const title = loc(game.title);
+const description = loc(game.shortDescription);
+
+const studio = game.studio && game.studio.name !== game.author.nickname ? game.studio.name : undefined;
+
+// Всё, по чему ищет каталог: название и описание на обоих языках, автор, студия, жанры, теги
+const searchText = normalizeSearch(
+  [
+    ...Object.values(game.title),
+    ...Object.values(game.shortDescription),
+    game.author.nickname,
+    game.studio?.name ?? '',
+    ...genreList.flatMap((g) => Object.values(g.name)),
+    ...tagList.flatMap((tg) => Object.values(tg.name)),
+    ...platformList.flatMap((p) => [...Object.values(p.name), ...(p.aliases ?? [])]),
+  ]
+    .filter(Boolean)
+    .join(' '),
+);
+---
+
+<article
+  class="card"
+  data-game
+  data-search={searchText}
+  data-genres={genreList.map((g) => g.slug).join(' ')}
+  data-tags={tagList.map((tg) => tg.slug).join(' ')}
+  data-platforms={platformList.map((p) => p.slug).join(' ')}
+  data-likes={game.likes}
+  data-downloads={game.downloads}
+  data-published={game.publishedAt}
+  data-adult={isAdultRating(game.ageRating) ? '1' : undefined}
+>
+  <div class="media">
+    <Cover title={title} cover={game.cover} sizes="(min-width: 1200px) 300px, (min-width: 600px) 50vw, 100vw" />
+    <GameLangBadge languages={game.languages} />
+    <AgeBadge rating={game.ageRating} overlay />
+  </div>
+
+  <div class="body">
+    <h3 class="title">
+      <a class="stretched" href={href(`/games/${game.slug}`)}>{title}</a>
+    </h3>
+    <p class="byline">
+      {
+        game.author.slug ? (
+          <a class="author-link" href={href(`/authors/${game.author.slug}`)} title={t('author.open', { name: game.author.nickname })}>
+            {game.author.nickname}
+          </a>
+        ) : (
+          game.author.nickname
+        )
+      }
+      {studio && <span class="studio"> · {studio}</span>}
+    </p>
+    <p class="desc" set:html={renderInlineMarkdown(description)} />
+
+    <div class="chips-wrap">
+      <TaxonomyChips genres={genreList} tags={tagList} platforms={platformList} maxGenres={2} maxTags={3} />
+    </div>
+
+    <div class="foot">
+      <GameStats slug={game.slug} likes={game.likes} downloads={game.downloads} />
+    </div>
+  </div>
+</article>
+
+<style>
+  .card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface-1);
+    overflow: hidden;
+    transition:
+      transform var(--t) var(--ease),
+      border-color var(--t) var(--ease),
+      box-shadow var(--t) var(--ease);
+  }
+
+  @media (hover: hover) {
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--brand-line);
+      box-shadow: var(--shadow-card);
+    }
+    .card:hover :global(.cover img),
+    .card:hover :global(.placeholder) {
+      transform: scale(1.04);
+    }
+    .card:hover .title a {
+      color: var(--brand-light);
+    }
+  }
+
+  .card:focus-within {
+    border-color: var(--brand-line);
+  }
+
+  .media {
+    position: relative;
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    flex: 1;
+    padding: 0.9rem 1rem 1rem;
+  }
+
+  .title {
+    font-size: var(--fs-lg);
+    font-weight: 800;
+  }
+
+  .title a {
+    transition: color var(--t-fast) var(--ease);
+  }
+
+  .title a:focus-visible {
+    outline: none;
+  }
+
+  /* Вся карточка кликабельна, при этом чипы остаются отдельными ссылками */
+  .stretched::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  .byline {
+    font-size: var(--fs-sm);
+    color: var(--brand);
+    font-weight: 600;
+  }
+
+  /* Ник автора — отдельная ссылка поверх «растянутой» ссылки карточки */
+  .author-link {
+    position: relative;
+    z-index: 2;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+    transition: text-decoration-color var(--t-fast) var(--ease);
+  }
+
+  .author-link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .studio {
+    color: var(--text-muted);
+  }
+
+  .desc {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .chips-wrap {
+    margin-top: 0.25rem;
+  }
+
+  .foot {
+    margin-top: auto;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+  }
+</style>

@@ -1,0 +1,247 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import Cover from './Cover.astro';
+import GameStats from './GameStats.astro';
+import Icon from './Icon.astro';
+import TaxonomyChips from './TaxonomyChips.astro';
+import AgeBadge from './AgeBadge.astro';
+import GameLangBadge from './GameLangBadge.astro';
+import type { GameSummary } from '../data/types';
+import { resolveGameTaxonomy, type TaxonomyIndex } from '../data/catalog';
+import { useI18n } from '../i18n';
+import { isAdultRating } from '../scripts/adult-filter';
+import { renderInlineMarkdown } from '../lib/inline-markdown';
+
+interface Props {
+  game: GameSummary;
+  taxonomy: TaxonomyIndex;
+}
+const { game, taxonomy } = Astro.props;
+const i18n = useI18n(Astro);
+const { t, loc } = i18n;
+const { genres: genreList, tags: tagList, platforms: platformList } = resolveGameTaxonomy(game, taxonomy);
+const href = i18n.href(`/games/${game.slug}`);
+const title = loc(game.title);
+---
+
+<section class="featured container" id="featured" aria-labelledby="featured-title" data-featured-section data-slug={game.slug} data-adult={isAdultRating(game.ageRating) ? '1' : undefined}>
+  <div class="section-head">
+    <h2 class="section-title" id="featured-title">{t('featured.title')}</h2>
+    <!-- Сколько лайков игра набрала за прошедшую неделю — подставляется из базы -->
+    <p class="weekly" data-weekly hidden>
+      <Icon name="heart" />
+      <span data-weekly-text></span>
+    </p>
+  </div>
+
+  <div class="frame">
+    <a class="media" href={href} tabindex="-1" aria-hidden="true">
+      <Cover title={title} cover={game.cover} sizes="(min-width: 900px) 60vw, 100vw" eager />
+      <GameLangBadge languages={game.languages} />
+      <AgeBadge rating={game.ageRating} overlay />
+    </a>
+
+    <div class="info">
+      <h3 class="title"><a href={href}>{title}</a></h3>
+      <p class="byline">
+        <span class="by">{t('common.by')}:</span>{' '}
+        {
+          game.author.slug ? (
+            <a class="author-link" href={i18n.href(`/authors/${game.author.slug}`)} title={t('author.open', { name: game.author.nickname })}>
+              {game.author.nickname}
+            </a>
+          ) : (
+            game.author.nickname
+          )
+        }
+        {game.studio && game.studio.name !== game.author.nickname && <span class="studio"> · {game.studio.name}</span>}
+      </p>
+      <p class="desc" set:html={renderInlineMarkdown(loc(game.shortDescription))} />
+
+      <TaxonomyChips genres={genreList} tags={tagList} platforms={platformList} />
+
+      <div class="foot">
+        <GameStats slug={game.slug} likes={game.likes} downloads={game.downloads} size="lg" />
+        <a class="btn btn-primary cta" href={href}>
+          {t('featured.open')}
+          <Icon name="arrow-right" />
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .featured {
+    padding-top: 2rem;
+  }
+
+  .section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .section-head .section-title {
+    margin-bottom: 0;
+  }
+
+  .weekly {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+  }
+
+  .weekly[hidden] {
+    display: none;
+  }
+
+  .weekly :global(.icon) {
+    color: var(--brand-deep);
+    fill: currentColor;
+  }
+
+  .author-link {
+    color: var(--brand);
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+    transition: text-decoration-color var(--t-fast) var(--ease);
+  }
+
+  .author-link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .section-title {
+    font-size: var(--fs-xl);
+    font-weight: 800;
+    margin-bottom: 1rem;
+    color: var(--brand);
+  }
+
+  /* Рамка из макета, но тонкая и в фирменном градиенте */
+  .frame {
+    position: relative;
+    display: grid;
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .frame::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    padding: 1px;
+    border-radius: inherit;
+    background: var(--brand-gradient);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .media {
+    position: relative;
+    display: block;
+  }
+
+  .media :global(.cover) {
+    height: 100%;
+  }
+
+  @media (hover: hover) {
+    .media:hover :global(.placeholder),
+    .media:hover :global(img) {
+      transform: scale(1.03);
+    }
+  }
+
+  .info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.25rem;
+  }
+
+  .title {
+    font-size: var(--fs-2xl);
+    font-weight: 800;
+  }
+
+  .title a:hover {
+    color: var(--brand-light);
+  }
+
+  .byline {
+    color: var(--brand);
+    font-weight: 700;
+  }
+
+  .by {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .studio {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  /* Краткое описание может быть любой длины — в блоке показываем до 4 строк, полностью — на странице игры */
+  .desc {
+    color: var(--text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 599px) {
+    .cta {
+      width: 100%;
+    }
+  }
+
+  @media (min-width: 900px) {
+    .frame {
+      grid-template-columns: 1.45fr 1fr;
+      min-height: 360px;
+    }
+    .info {
+      padding: 1.75rem 2rem;
+      justify-content: center;
+    }
+    .media :global(.cover) {
+      aspect-ratio: auto;
+      min-height: 100%;
+    }
+  }
+</style>

@@ -1,0 +1,9 @@
+# Kaviku - открытый исходный код / open source (AGPL-3.0)
+# Сайт: https://kaviku.pages.dev
+# GitHub: https://github.com/Kaviku-Group/Kaviku
+# SPDX-License-Identifier: AGPL-3.0-only
+
+User-agent: *
+Allow: /
+# Переходы на скачивание (появятся позже) не должны индексироваться
+Disallow: /go/

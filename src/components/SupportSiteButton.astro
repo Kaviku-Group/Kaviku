@@ -1,0 +1,32 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import Icon from './Icon.astro';
+import { siteConfig, isUsableUrl } from '../config/site';
+import { useI18n } from '../i18n';
+
+interface Props {
+  class?: string;
+}
+const { class: className = '' } = Astro.props;
+const { t } = useI18n(Astro);
+const url = siteConfig.supportSiteUrl;
+const enabled = isUsableUrl(url);
+---
+
+{
+  enabled ? (
+    <a class:list={['btn btn-outline', className]} href={url} target="_blank" rel="noopener noreferrer">
+      <Icon name="heart" />
+      {t('header.supportSite')}
+    </a>
+  ) : (
+    <span class:list={['btn btn-outline', className]} aria-disabled="true" title={t('common.linkSoon')}>
+      <Icon name="heart" />
+      {t('header.supportSite')}
+    </span>
+  )
+}

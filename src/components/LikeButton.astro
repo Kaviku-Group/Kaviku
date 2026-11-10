@@ -1,0 +1,132 @@
+---
+// Kaviku - открытый исходный код / open source (AGPL-3.0)
+// Сайт: https://kaviku.pages.dev
+// GitHub: https://github.com/Kaviku-Group/Kaviku
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import Icon from './Icon.astro';
+import { useI18n } from '../i18n';
+
+/**
+ * Кнопка «Нравится» на странице игры. Состояние и число лайков — из базы D1 (/api/likes/<slug>).
+ * Повторное нажатие убирает лайк. Пока API недоступен (npm run dev), кнопка неактивна.
+ */
+interface Props {
+  slug: string;
+}
+const { slug } = Astro.props;
+const { t } = useI18n(Astro);
+---
+
+<button
+  class="btn btn-outline btn-lg like"
+  type="button"
+  data-like
+  data-slug={slug}
+  aria-pressed="false"
+  disabled
+  data-label-like={t('game.like')}
+  data-label-liked={t('game.liked')}
+>
+  <Icon name="heart" />
+  <span data-like-label>{t('game.like')}</span>
+  <span class="count" data-like-count></span>
+</button>
+<p class="like-error" data-like-error role="status" hidden>{t('game.likeError')}</p>
+
+<script>
+  import { applyStats, getCounts } from '../scripts/stats';
+  import { pageI18n } from '../i18n';
+
+  const { formatCount } = pageI18n();
+
+  document.querySelectorAll<HTMLButtonElement>('[data-like]').forEach(async (btn) => {
+    const slug = btn.dataset.slug!;
+    const label = btn.querySelector<HTMLElement>('[data-like-label]')!;
+    const count = btn.querySelector<HTMLElement>('[data-like-count]')!;
+    const errorEl = btn.parentElement?.querySelector<HTMLElement>('[data-like-error]');
+    let liked = false;
+    let likes = 0;
+    let busy = false;
+
+    const show = () => {
+      btn.setAttribute('aria-pressed', String(liked));
+      btn.classList.toggle('is-liked', liked);
+      label.textContent = (liked ? btn.dataset.labelLiked : btn.dataset.labelLike) ?? '';
+      count.textContent = formatCount(likes);
+      // Число лайков в других блоках страницы (статистика под кнопками, карточки)
+      applyStats({ [slug]: { likes, downloads: getCounts(slug).downloads } }, true);
+    };
+
+    try {
+      const res = await fetch(`/api/likes/${slug}`, { credentials: 'same-origin' });
+      if (!res.ok || !(res.headers.get('Content-Type') ?? '').includes('json')) return;
+      ({ liked, likes } = (await res.json()) as { liked: boolean; likes: number });
+      btn.disabled = false;
+      show();
+    } catch {
+      return; // API недоступен — кнопка остаётся неактивной
+    }
+
+    btn.addEventListener('click', async () => {
+      if (busy) return;
+      busy = true;
+      const before = { liked, likes };
+      // Сразу показываем результат, потом подтверждаем у сервера
+      liked = !liked;
+      likes = Math.max(0, likes + (liked ? 1 : -1));
+      show();
+      if (errorEl) errorEl.hidden = true;
+      try {
+        const res = await fetch(`/api/likes/${slug}`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ liked }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        ({ liked, likes } = (await res.json()) as { liked: boolean; likes: number });
+      } catch {
+        ({ liked, likes } = before);
+        if (errorEl) errorEl.hidden = false;
+      }
+      show();
+      busy = false;
+    });
+  });
+</script>
+
+<style>
+  .like .count {
+    min-width: 1ch;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.85;
+  }
+
+  .like.is-liked {
+    background: var(--brand-soft);
+    border-color: var(--brand-deep);
+    color: var(--brand-deep);
+  }
+
+  .like.is-liked :global(.icon) {
+    fill: currentColor;
+  }
+
+  .like:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .like-error {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--brand-deep);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+  }
+
+  .like-error[hidden] {
+    display: none;
+  }
+</style>

@@ -1,0 +1,41 @@
+{
+  "name": "kaviku",
+  "type": "module",
+  "version": "0.0.1",
+  "license": "AGPL-3.0-only",
+  "homepage": "https://kaviku.pages.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kaviku-Group/Kaviku"
+  },
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build && node scripts/postbuild.mjs",
+    "preview": "astro preview",
+    "astro": "astro",
+    "check": "astro check",
+    "logos": "node scripts/prepare-logos.mjs",
+    "game:check": "tsx scripts/check-game.ts",
+    "export:github": "node scripts/export-github.mjs",
+    "license:headers": "node scripts/license-headers.mjs",
+    "pages:preview": "npm run build && wrangler pages dev ./dist",
+    "deploy": "node scripts/stamp-new-games.mjs && npm run build && wrangler pages deploy ./dist --project-name kaviku"
+  },
+  "dependencies": {
+    "@fontsource-variable/manrope": "^5.3.0",
+    "astro": "^7.4.5",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@cloudflare/workers-types": "^5.20261104.1",
+    "@types/node": "^26.6.6",
+    "sharp": "^0.35.5",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.157.0"
+  }
+}

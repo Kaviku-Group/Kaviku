@@ -1,0 +1,18 @@
+# Kaviku - открытый исходный код / open source (AGPL-3.0)
+# Сайт: https://kaviku.pages.dev
+# GitHub: https://github.com/Kaviku-Group/Kaviku
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Конфигурация Cloudflare Pages.
+name = "kaviku"
+compatibility_date = "2026-10-01"
+pages_build_output_dir = "./dist"
+
+# База данных D1: лайки и скачивания.
+# database_id — код базы из команды `npx wrangler d1 create kaviku` (регион EEUR).
+# binding = "DB" — так база называется в коде функций (не менять).
+[[d1_databases]]
+binding = "DB"
+database_name = "kaviku"
+database_id = "39c26e5c-97b2-47ec-bacb-f885ed5e3bc5"
+migrations_dir = "migrations"
